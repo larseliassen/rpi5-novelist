@@ -1,0 +1,35 @@
+---
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const kapitler = await getCollection('kapitler');
+  return kapitler.map((entry) => ({
+    params: { slug: entry.slug },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await entry.render();
+const base = import.meta.env.BASE_URL;
+---
+
+<html lang="nb">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kapittel {entry.data.chapter}: {entry.data.title}</title>
+    <style>
+      body { font-family: Georgia, 'Times New Roman', serif; max-width: 40rem;
+             margin: 3rem auto; padding: 0 1.25rem; line-height: 1.75; font-size: 1.1rem; }
+      a.back { font-size: 0.9rem; color: #888; text-decoration: none; }
+      h1 { font-size: 1.6rem; margin: 1rem 0 2rem; }
+      p { margin: 1.1rem 0; }
+    </style>
+  </head>
+  <body>
+    <a class="back" href={base + '/'}>← Alle kapitler</a>
+    <h1>Kapittel {entry.data.chapter}: {entry.data.title}</h1>
+    <article><Content /></article>
+  </body>
+</html>

@@ -1,0 +1,42 @@
+---
+import { getCollection } from 'astro:content';
+
+const kapitler = (await getCollection('kapitler')).sort(
+  (a, b) => a.data.chapter - b.data.chapter
+);
+const base = import.meta.env.BASE_URL;
+---
+
+<html lang="nb">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Krimromanen</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: Georgia, 'Times New Roman', serif; max-width: 42rem;
+             margin: 3rem auto; padding: 0 1.25rem; line-height: 1.6; }
+      h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+      .sub { color: #888; margin-bottom: 2.5rem; }
+      ol { list-style: none; padding: 0; }
+      li { margin: 0.75rem 0; display: flex; justify-content: space-between; gap: 1rem; }
+      a { text-decoration: none; color: inherit; border-bottom: 1px solid #ccc; }
+      a:hover { border-color: currentColor; }
+      time { color: #999; font-size: 0.85rem; white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <h1>Krimromanen</h1>
+    <p class="sub">Ett kapittel om dagen, skrevet av en Raspberry Pi.</p>
+    <ol>
+      {kapitler.map((k) => (
+        <li>
+          <a href={`${base}/${k.slug}/`}>
+            Kapittel {k.data.chapter}: {k.data.title}
+          </a>
+          <time datetime={k.data.date}>{k.data.date}</time>
+        </li>
+      ))}
+    </ol>
+  </body>
+</html>
