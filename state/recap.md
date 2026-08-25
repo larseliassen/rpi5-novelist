@@ -1,0 +1,1 @@
+Anders Bjørnstad, en gammel mand med en gammel bøygetur i hånden, har vært involvert i en tragisk hendelse på Fjerdesund. Han ble sendt for å ta seg av en død kropp i båten.  Bilder fra kameraet viser at han holdt pistol mot skråningen til kroppen før han ble sendt for å ta seg av det.
