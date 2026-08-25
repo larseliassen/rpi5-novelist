@@ -100,7 +100,9 @@ in
     wantedBy = [ "multi-user.target" ];
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
-    path = [ pkgs.git ];
+    # openssh is required even though we never invoke ssh directly: git shells out
+    # to it for git@ remotes, and systemd units get an empty PATH by default.
+    path = [ pkgs.git pkgs.openssh ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
@@ -121,7 +123,8 @@ in
     description = "Write one crime-novel chapter (Norwegian)";
     after = [ "network-online.target" "ollama.service" "novelist-bootstrap.service" ];
     wants = [ "network-online.target" "ollama.service" "novelist-bootstrap.service" ];
-    path = with pkgs; [ git ollama (python3.withPackages (ps: with ps; [ requests ])) ];
+    # openssh: run.sh does `git push` over a git@ remote (see novelist-bootstrap).
+    path = with pkgs; [ git openssh ollama (python3.withPackages (ps: with ps; [ requests ])) ];
     serviceConfig = {
       Type = "oneshot";
       User = novelUser;
