@@ -1,8 +1,7 @@
 # rpi5-novelist
 
 A Raspberry Pi 5 running **NixOS** that writes a **Norwegian (bokmål) crime
-novel**, one chapter per day, with a **local LLM** via Ollama, and publishes it as
-an **Astro** site on **GitHub Pages**.
+novel**, one chapter per day, with a **local LLM** via Ollama.
 
 - Mystery is **improvised** (no fixed solution up front), nudged by a rotating
   "director beat" so it escalates and pays off instead of wandering.
@@ -11,17 +10,32 @@ an **Astro** site on **GitHub Pages**.
   into the tiny context window.
 - Runs **forever-ish**: a new chapter every morning at 06:00 Europe/Oslo.
 
+## Two repos
+
+GitHub Pages will not serve a **private** repo on a free plan, so the project is
+split. The Pi pushes to both, with a separate deploy key for each.
+
+| | repo | holds |
+|---|---|---|
+| **private** | `larseliassen/rpi5-novelist` (this one) | NixOS config, orchestrator, `state/` |
+| **public** | [`larseliassen/mikromidas`](https://github.com/larseliassen/mikromidas) | `chapters/`, Astro site → [Pages](https://larseliassen.github.io/mikromidas/) |
+
+`state/` — the notebook — stays private on purpose: it contains the planted
+clues and red herrings, so publishing it would spoil the story as it is written.
+
 ```
-rpi5-novelist/
-├── flake.nix                  # NixOS system (RPi5, boots from SSD)
+rpi5-novelist/                 -> cloned to /var/lib/novelist
+├── flake.nix                  # NixOS system (RPi5, boots from SD)
 ├── nixos/configuration.nix    # ollama + daily systemd timer + user
 ├── orchestrator/
 │   ├── modelfile/Modelfile    # builds the `novelist` Ollama model
 │   ├── write_chapter.py       # the brain: writes + updates notebook
-│   └── run.sh                 # daily entrypoint (write → git push)
-├── web/                       # Astro site → GitHub Pages
-├── chapters/                  # kapittel-NNN.md (shared by Pi + site)
-├── state/                     # the compressed notebook (git-tracked)
+│   └── run.sh                 # daily entrypoint (write → push to both repos)
+└── state/                     # the compressed notebook (git-tracked, private)
+
+mikromidas/                    -> cloned to /var/lib/novelist-web
+├── chapters/                  # kapittel-NNN.md, written by the Pi
+├── web/                       # Astro site
 └── .github/workflows/deploy.yml
 ```
 
@@ -69,43 +83,47 @@ Edit `nixos/configuration.nix` before step 4 to set your own SSH public key, the
 
 ## 2. First-time app setup on the Pi
 
-The repo is **private**, so the Pi needs its own key before it can clone or push.
-Do this *before* the first `nixos-rebuild`, otherwise `novelist-bootstrap` fails:
+**Deploy keys are per-repo**, so the Pi needs *two* — one for this private repo
+(to clone and to push the notebook) and one for `mikromidas` (to push chapters).
+Generate both *before* the first `nixos-rebuild`, or `novelist-bootstrap` fails:
 
 ```bash
 # as the `novelist` user, on the Pi
-ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
-cat ~/.ssh/id_ed25519.pub
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_novelist
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_mikromidas
+
+# git picks the right key per host alias; the clone URLs use github.com, so map
+# each repo to its own alias-free entry via IdentitiesOnly + Match.
+cat > ~/.ssh/config <<'EOF'
+Host github.com
+  IdentitiesOnly yes
+  IdentityFile ~/.ssh/id_novelist
+  IdentityFile ~/.ssh/id_mikromidas
+EOF
+chmod 600 ~/.ssh/config
+
+cat ~/.ssh/id_novelist.pub ~/.ssh/id_mikromidas.pub
 ```
 
-Add that public key to the repo on GitHub under **Settings → Deploy keys**, with
-**"Allow write access" ticked** — the daily job pushes each new chapter, so a
-read-only deploy key is not enough.
+Add each public key under **Settings → Deploy keys** of its repo, with **"Allow
+write access" ticked** — the daily job pushes, so a read-only key is not enough.
+SSH offers both keys and GitHub accepts whichever is authorised for that repo.
 
-The `novelist-bootstrap` service then clones the repo into `/var/lib/novelist`.
-The remaining one-time steps:
+`novelist-bootstrap` then clones this repo into `/var/lib/novelist` and
+`mikromidas` into `/var/lib/novelist-web`. The remaining one-time steps:
 
 ```bash
-# as the `novelist` user
-cd /var/lib/novelist
-
-# Pull a base model and build the persona model:
-ollama pull mistral:7b-instruct        # or your chosen Norwegian GGUF
-ollama create novelist -f orchestrator/modelfile/Modelfile
-
-# The daily commit needs an author identity:
-git config user.name  "novelist (rpi5)"
-git config user.email "novelist@localhost"
+# as the `novelist` user — the daily commits need an author identity in BOTH
+git config --global user.name  "novelist (rpi5)"
+git config --global user.email "novelist@localhost"
 
 # Dry run one chapter now (instead of waiting for 06:00):
 sudo systemctl start novelist.service
 journalctl -u novelist.service -f
 ```
 
-> **GitHub Pages on a private repo requires a paid plan** (Pro/Team/Enterprise).
-> On a free account `.github/workflows/deploy.yml` will build but fail to deploy.
-> Either upgrade, or make the repo public and keep secrets out of it — which is
-> what the Wi-Fi `secretsFile` and the deploy-key setup above are designed for.
+The model is built from the Modelfile automatically on every run, so there is no
+manual `ollama pull` / `ollama create` step.
 
 ## 3. Choosing the model (Norwegian quality vs. RAM)
 
@@ -152,25 +170,16 @@ A full chapter is ~20–40 min at these speeds; fine for a once-daily job.
 
 ## 4. The website
 
-The GitHub Action symlinks repo-root `chapters/` into Astro's content
-collection, builds, and deploys to Pages. To enable:
-
-1. Repo **Settings → Pages → Source: GitHub Actions**.
-2. Set `site`/`base` in `web/astro.config.mjs` to your Pages URL.
-3. Push. Every time the Pi commits a new chapter, the site rebuilds automatically.
-
-Local preview:
-```bash
-cd web
-ln -sfn ../../../chapters src/content/kapitler
-npm install && npm run dev
-```
+Lives in the public repo — see
+[`larseliassen/mikromidas`](https://github.com/larseliassen/mikromidas). Its
+Action symlinks that repo's `chapters/` into Astro's content collection, builds,
+and deploys to <https://larseliassen.github.io/mikromidas/>. Every chapter the
+Pi pushes rebuilds the site automatically; nothing here needs to change.
 
 ## Tuning the story
 
 - **Pace / payoffs:** edit `DIRECTOR_BEATS` in `write_chapter.py`.
 - **Voice / rules:** edit the `SYSTEM` block in the Modelfile.
-- **Reset the novel:** delete `state/` and `chapters/`; next run bootstraps a
-  fresh premise.
+- **Reset the novel:** delete `state/` here and `chapters/` in `mikromidas`; the
+  next run bootstraps a fresh premise.
 - **Chapter length:** `num_predict` in `write_chapter.py` (~2600 ≈ 1500–2200 words).
-```

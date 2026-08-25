@@ -17,7 +17,9 @@ State layout (all markdown/json, git-friendly):
   state/timeline.md      what happened when
   state/recap.md         rolling ~300-word "historien så langt"
   state/meta.json        {chapter_count, ...}
-  chapters/kapittel-NN.md
+
+Chapters are written to $NOVELIST_CHAPTERS_DIR (the public site repo), not here:
+  <public repo>/chapters/kapittel-NN.md
 """
 
 import json
@@ -35,7 +37,11 @@ MODEL = os.environ.get("NOVELIST_MODEL", "novelist")
 ROOT = Path(os.environ.get("NOVELIST_DIR", ".")).resolve()
 
 STATE = ROOT / "state"
-CHAPTERS = ROOT / "chapters"
+# Chapters are published from a separate PUBLIC repo (larseliassen/mikromidas),
+# because GitHub Pages will not serve a private repo on a free plan. The notebook
+# in state/ stays here in the private repo — it holds the planted clues and red
+# herrings. Defaults to ROOT/chapters so a single-repo checkout still works.
+CHAPTERS = Path(os.environ.get("NOVELIST_CHAPTERS_DIR", ROOT / "chapters")).resolve()
 
 # ---- Director beats: injected on a cadence to shape the improvisation ----
 # The loop cycles through these so an "improvised" mystery still escalates and

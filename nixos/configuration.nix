@@ -9,6 +9,12 @@ let
   # The repo is private, so both the bootstrap clone and the daily push need a
   # deploy key on the Pi — anonymous https cannot read it. See README §2.
   repoUrl = "git@github.com:larseliassen/rpi5-novelist.git";
+
+  # The chapters and the Astro site live in a separate PUBLIC repo, because
+  # GitHub Pages will not serve a private repo on a free plan. The Pi pushes each
+  # chapter there. Deploy keys are per-repo, so this needs its own key.
+  webDir = "/var/lib/novelist-web";
+  webRepoUrl = "git@github.com:larseliassen/mikromidas.git";
 in
 {
   imports = [ ];
@@ -138,11 +144,16 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
       User = novelUser;
-      StateDirectory = "novelist";
+      StateDirectory = "novelist novelist-web";
     };
     script = ''
       if [ ! -d ${appDir}/.git ]; then
         git clone ${repoUrl} ${appDir}
+      fi
+      # The public site repo. Cloned over ssh rather than https so the daily push
+      # authenticates with its own deploy key (deploy keys are per-repo).
+      if [ ! -d ${webDir}/.git ]; then
+        git clone ${webRepoUrl} ${webDir}
       fi
     '';
   };
@@ -160,6 +171,7 @@ in
       Type = "oneshot";
       User = novelUser;
       WorkingDirectory = appDir;
+      StateDirectory = "novelist novelist-web";
       # Give a single chapter plenty of time on slow CPU inference.
       TimeoutStartSec = "3h";
       ExecStart = "${pkgs.bash}/bin/bash ${appDir}/orchestrator/run.sh";
@@ -167,6 +179,7 @@ in
         "OLLAMA_HOST=http://127.0.0.1:11434"
         "NOVELIST_MODEL=novelist"        # the Modelfile-built model name
         "NOVELIST_DIR=${appDir}"
+        "NOVELIST_WEB_DIR=${webDir}"     # public repo: chapters get written here
       ];
     };
   };
