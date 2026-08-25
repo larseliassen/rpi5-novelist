@@ -23,6 +23,11 @@ if [ -d .git ]; then
   if ! git diff --cached --quiet; then
     N="$(python3 -c 'import json;print(json.load(open("state/meta.json"))["chapter_count"])')"
     git commit -m "Kapittel ${N} ($(date +%F))"
+    # Rebase onto whatever landed upstream since the last run. Without this, one
+    # commit made from a laptop leaves the Pi permanently non-fast-forward and it
+    # silently stops publishing chapters.
+    git pull --rebase --autostash origin "$(git rev-parse --abbrev-ref HEAD)" \
+      || echo "[run] git pull --rebase feilet; prøver push likevel."
     git push origin HEAD || echo "[run] git push feilet (sjekk credentials)."
   else
     echo "[run] Ingen endringer å committe."
