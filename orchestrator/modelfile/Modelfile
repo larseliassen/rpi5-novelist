@@ -4,20 +4,27 @@
 # completion model and follows instructions poorly, so we prefer an instruct build.
 # Pick ONE FROM line. Verify availability on the Pi with `ollama pull`.
 #
-#   Option A (in use): 7B at Q3, sized for a 4GB Pi 5.
-# The default q4_0 build is 4.4GB and cannot fit in this board's 4GB alongside
-# the KV cache. Q3_K_S is 3.2GB, which leaves the weights resident and lets zram
-# absorb the overflow. See the memory budget in README §3.
-FROM mistral:7b-instruct-v0.3-q3_K_S
+# MEASURED on this board (4GB Pi 5), see README §3 for the full table. Anything
+# whose weights exceed ~3GB is OOM-killed at load time, so the choice is narrow.
 #
-#   Option B (safest fit if A thrashes; noticeably weaker Norwegian at Q2):
-# FROM mistral:7b-instruct-v0.3-q2_K
+#   Option A (in use): 1.6GB. The only model tested that both fits comfortably
+# and writes real Norwegian words. Its prose is weak — it produces fluent but
+# semantically odd images — but it is the best of a bad set at this RAM budget.
+FROM gemma2:2b
 #
-#   Option C (more explicitly Norwegian; pull a GGUF and point FROM at the file):
-# FROM ./normistral-11b-instruct.Q4_K_M.gguf
+#   Option B: 2.6GB, fits, but drifts into Danish ("strømmed", "gutterne").
+# FROM qwen3:4b-instruct-2507-q4_K_M
 #
-#   Option D (small/fast fallback, ~1.6GB):
-# FROM gemma2:2b
+#   DEAD ENDS — do not re-try these on a 4GB board:
+# mistral:7b-instruct-v0.3-q3_K_S  3.2GB  fits, but Q3 destroys the Norwegian:
+#                                         output is invented non-words.
+# mistral:7b-instruct-v0.3-q2_K    2.7GB  Q2 is strictly worse than Q3 here.
+# gemma3:4b                        3.3GB  OOM at load.
+# llama3.2:3b-instruct-q8_0        3.4GB  OOM at load.
+# qwen2.5:3b-instruct              1.9GB  fits; heavy Danish drift + metatext.
+#
+# The real fix is an 8GB/16GB Pi 5, which puts mistral:7b-instruct at q4_0 (4.4GB)
+# or a NorMistral GGUF in reach. Those are the first things to try after a swap.
 
 # Memory lives in the compressed notebook, not in raw chapter stuffing, so the
 # context stays small. Do NOT drop below 4096: write_chapter.py asks for

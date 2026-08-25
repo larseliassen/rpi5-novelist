@@ -7,11 +7,12 @@ cd "${NOVELIST_DIR:-$(dirname "$0")/..}"
 
 MODEL="${NOVELIST_MODEL:-novelist}"
 
-# Build the model from the Modelfile if it isn't present yet.
-if ! ollama list | grep -q "^${MODEL}"; then
-  echo "[run] Bygger modell '${MODEL}' fra Modelfile ..."
-  ollama create "${MODEL}" -f orchestrator/modelfile/Modelfile
-fi
+# (Re)build the model from the Modelfile every run. This is near-free when nothing
+# changed — `create` only rewrites a manifest over blobs that are already on disk —
+# and it means a Modelfile edit takes effect on the next run instead of being
+# silently ignored because a stale `novelist` model still exists.
+echo "[run] Bygger modell '${MODEL}' fra Modelfile ..."
+ollama create "${MODEL}" -f orchestrator/modelfile/Modelfile
 
 # Generate today's chapter + update state.
 python3 orchestrator/write_chapter.py

@@ -1,6 +1,6 @@
 # rpi5-novelist
 
-A Raspberry Pi 5 (8GB) running **NixOS** that writes a **Norwegian (bokmål) crime
+A Raspberry Pi 5 running **NixOS** that writes a **Norwegian (bokmål) crime
 novel**, one chapter per day, with a **local LLM** via Ollama, and publishes it as
 an **Astro** site on **GitHub Pages**.
 
@@ -107,17 +107,45 @@ journalctl -u novelist.service -f
 > Either upgrade, or make the repo public and keep secrets out of it — which is
 > what the Wi-Fi `secretsFile` and the deploy-key setup above are designed for.
 
-## 3. Choosing the model (Norwegian quality vs. speed)
+## 3. Choosing the model (Norwegian quality vs. RAM)
 
-Edit `orchestrator/modelfile/Modelfile`:
+**Know which board you have first** — `head -1 /proc/meminfo`. This matters more
+than anything else in this repo.
 
-- **`mistral:7b-instruct`** — good instruction following, usable Norwegian.
-  Best default for the write→update-notebook loop. ~1.5–3 tok/s on Pi CPU.
-- **NorMistral 11B instruct (GGUF)** — more natively Norwegian. Tight on 8GB at
-  Q4 (~6.5GB). Point `FROM` at the downloaded `.gguf`. Slower.
-- **`gemma2:2b`** — fast fallback; weaker prose.
-- Avoid the *base* NorMistral "warm" model here — it's a completion model and
-  ignores instructions.
+### On a 4GB Pi 5
+
+Measured on the actual hardware, same prompt (`num_ctx 4096`) for each:
+
+| Model | Weights | Fits? | Norwegian |
+|---|---|---|---|
+| `gemma2:2b` | 1.6GB | yes | **best available** — real words, but semantically odd images |
+| `qwen3:4b-instruct-2507-q4_K_M` | 2.6GB | yes | drifts into Danish (`strømmed`, `gutterne`) |
+| `qwen2.5:3b-instruct` | 1.9GB | yes | heavy Danish drift, adds metatext |
+| `mistral:7b-instruct-v0.3-q3_K_S` | 3.2GB | barely | **unusable** — invented non-words |
+| `gemma3:4b` | 3.3GB | no | OOM at load |
+| `llama3.2:3b-instruct-q8_0` | 3.4GB | no | OOM at load |
+
+Two lessons worth keeping:
+
+- **Anything over ~3GB of weights is OOM-killed at load** on this board.
+- **Aggressive quantization wrecks non-English far faster than English.** A 7B at
+  Q3 is *worse* at Norwegian than a 2B at Q4, so "shrink the big model" is a dead
+  end here — Q2 is worse still. Pick a smaller model, not a coarser quant.
+
+Repeated OOMs will hang the board hard enough to need a physical power cycle, so
+`configuration.nix` caps `ollama.service` with `MemoryMax` and pins
+`OLLAMA_MAX_LOADED_MODELS=1`. Don't remove those on a 4GB board.
+
+### On an 8GB/16GB Pi 5
+
+The interesting models come back into range — try these first:
+
+- **`mistral:7b-instruct`** (q4_0, 4.4GB) — good instruction following, usable
+  Norwegian. ~1.5–3 tok/s on Pi CPU.
+- **NorMistral 7B/11B instruct (GGUF)** — more natively Norwegian. Point `FROM`
+  at the downloaded `.gguf`. Slower.
+- Avoid the *base* NorMistral "warm" model — it's a completion model and ignores
+  instructions.
 
 A full chapter is ~20–40 min at these speeds; fine for a once-daily job.
 `num_ctx` is deliberately small (4096) because memory lives in the notebook.

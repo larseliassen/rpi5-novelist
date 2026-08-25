@@ -68,6 +68,18 @@ in
     settings.PasswordAuthentication = false;
   };
 
+  # mDNS, so the box answers to `novelist.local` from the Mac. The Pi is on DHCP
+  # and its lease moves, so without this you are reduced to sweeping the LAN.
+  services.avahi = {
+    enable = true;
+    publish = {
+      enable = true;
+      addresses = true;
+      workstation = true;
+    };
+    nssmdns4 = true;
+  };
+
   # The bootstrap clone and the daily push run non-interactively, so github.com's
   # host key must already be trusted or ssh aborts at the prompt.
   programs.ssh.knownHosts.github = {
@@ -81,6 +93,25 @@ in
     # CPU inference on the Pi. Keep it modest so the box stays responsive.
     host = "127.0.0.1";
     port = 11434;
+    environmentVariables = {
+      # This board has 4GB. Two resident models do not fit, and ollama will happily
+      # keep the previous one loaded while it loads the next — which is exactly how
+      # we OOM-killed the box. One at a time, evicted promptly.
+      OLLAMA_MAX_LOADED_MODELS = "1";
+      OLLAMA_NUM_PARALLEL = "1";
+      OLLAMA_KEEP_ALIVE = "60s";
+    };
+  };
+
+  # A model that is too large for 4GB must fail as a *service* failure, not by
+  # inviting the kernel OOM killer to shoot at the whole system. Without this the
+  # board hangs hard and needs a physical power cycle (learned the hard way).
+  systemd.services.ollama.serviceConfig = {
+    MemoryHigh = "2900M";     # throttle + reclaim before things get desperate
+    MemoryMax = "3200M";      # hard cap: cgroup OOM kills only ollama
+    OOMPolicy = "continue";
+    Restart = "always";
+    RestartSec = "10s";
   };
 
   ###### Packages ######
@@ -151,7 +182,8 @@ in
   };
 
   ###### Housekeeping ######
-  # Zram helps a lot on 8GB when a 7B model is resident.
+  # This board is a 4GB Pi 5, so zram is not a nicety — it is what keeps the
+  # working set alive while a ~2.5GB model is resident.
   zramSwap.enable = true;
   zramSwap.memoryPercent = 50;
 
