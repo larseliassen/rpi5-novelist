@@ -4,17 +4,24 @@
 # completion model and follows instructions poorly, so we prefer an instruct build.
 # Pick ONE FROM line. Verify availability on the Pi with `ollama pull`.
 #
-#   Option A (recommended, good instruction following, decent Norwegian):
-FROM mistral:7b-instruct
+#   Option A (in use): 7B at Q3, sized for a 4GB Pi 5.
+# The default q4_0 build is 4.4GB and cannot fit in this board's 4GB alongside
+# the KV cache. Q3_K_S is 3.2GB, which leaves the weights resident and lets zram
+# absorb the overflow. See the memory budget in README §3.
+FROM mistral:7b-instruct-v0.3-q3_K_S
 #
-#   Option B (more explicitly Norwegian; pull a GGUF and point FROM at the file):
+#   Option B (safest fit if A thrashes; noticeably weaker Norwegian at Q2):
+# FROM mistral:7b-instruct-v0.3-q2_K
+#
+#   Option C (more explicitly Norwegian; pull a GGUF and point FROM at the file):
 # FROM ./normistral-11b-instruct.Q4_K_M.gguf
 #
-#   Option C (small/fast fallback):
+#   Option D (small/fast fallback, ~1.6GB):
 # FROM gemma2:2b
 
-# Small context keeps RAM sane on 8GB. We rely on a compressed notebook, not raw
-# chapter stuffing, so 4k is plenty. Bump if your chosen model + RAM allow.
+# Memory lives in the compressed notebook, not in raw chapter stuffing, so the
+# context stays small. Do NOT drop below 4096: write_chapter.py asks for
+# num_predict 2600, and the notebook prompt sits in front of that.
 PARAMETER num_ctx 4096
 PARAMETER temperature 0.85
 PARAMETER top_p 0.92
