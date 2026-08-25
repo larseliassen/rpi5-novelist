@@ -89,25 +89,22 @@ Generate both *before* the first `nixos-rebuild`, or `novelist-bootstrap` fails:
 
 ```bash
 # as the `novelist` user, on the Pi
-ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_novelist
-ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_mikromidas
-
-# git picks the right key per host alias; the clone URLs use github.com, so map
-# each repo to its own alias-free entry via IdentitiesOnly + Match.
-cat > ~/.ssh/config <<'EOF'
-Host github.com
-  IdentitiesOnly yes
-  IdentityFile ~/.ssh/id_novelist
-  IdentityFile ~/.ssh/id_mikromidas
-EOF
-chmod 600 ~/.ssh/config
-
-cat ~/.ssh/id_novelist.pub ~/.ssh/id_mikromidas.pub
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519      # -> rpi5-novelist
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_mikromidas   # -> mikromidas
+cat ~/.ssh/id_ed25519.pub ~/.ssh/id_mikromidas.pub
 ```
 
-Add each public key under **Settings → Deploy keys** of its repo, with **"Allow
-write access" ticked** — the daily job pushes, so a read-only key is not enough.
-SSH offers both keys and GitHub accepts whichever is authorised for that repo.
+Add each public key under **Settings → Deploy keys** of its own repo, with
+**"Allow write access" ticked** — the daily job pushes, so a read-only key is
+not enough.
+
+> **Do not list both keys under `Host github.com`.** GitHub binds an SSH
+> connection to whichever deploy key authenticates *first*, so ssh never reaches
+> the second key: it authenticates as `rpi5-novelist` and is then denied on
+> `mikromidas`. `configuration.nix` therefore defines a `github-mikromidas` host
+> alias with its own `IdentityFile` and `IdentitiesOnly yes`, and the public
+> repo's remote uses `git@github-mikromidas:...`. This is handled declaratively;
+> no `~/.ssh/config` is needed.
 
 `novelist-bootstrap` then clones this repo into `/var/lib/novelist` and
 `mikromidas` into `/var/lib/novelist-web`. The remaining one-time steps:

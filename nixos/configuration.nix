@@ -12,9 +12,15 @@ let
 
   # The chapters and the Astro site live in a separate PUBLIC repo, because
   # GitHub Pages will not serve a private repo on a free plan. The Pi pushes each
-  # chapter there. Deploy keys are per-repo, so this needs its own key.
+  # chapter there.
+  #
+  # Note the host ALIAS rather than plain github.com. Deploy keys are per-repo,
+  # and GitHub binds an SSH connection to whichever key authenticates first — so
+  # listing two IdentityFiles for github.com always authenticates as the
+  # rpi5-novelist key and then gets denied on mikromidas. A distinct Host block
+  # (see programs.ssh.extraConfig) is the only reliable way to pick the key.
   webDir = "/var/lib/novelist-web";
-  webRepoUrl = "git@github.com:larseliassen/mikromidas.git";
+  webRepoUrl = "git@github-mikromidas:larseliassen/mikromidas.git";
 in
 {
   imports = [ ];
@@ -87,11 +93,26 @@ in
   };
 
   # The bootstrap clone and the daily push run non-interactively, so github.com's
-  # host key must already be trusted or ssh aborts at the prompt.
+  # host key must already be trusted or ssh aborts at the prompt. The alias below
+  # resolves to the same host, hence the same key under both names.
   programs.ssh.knownHosts.github = {
-    hostNames = [ "github.com" ];
+    hostNames = [ "github.com" "github-mikromidas" ];
     publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
   };
+
+  # One deploy key per repo, selected by host alias. IdentitiesOnly is essential:
+  # without it ssh also offers the agent's/default keys, authenticates as the
+  # wrong repo's deploy key, and GitHub then refuses the push.
+  programs.ssh.extraConfig = ''
+    Host github.com
+      IdentitiesOnly yes
+      IdentityFile /home/${novelUser}/.ssh/id_ed25519
+
+    Host github-mikromidas
+      HostName github.com
+      IdentitiesOnly yes
+      IdentityFile /home/${novelUser}/.ssh/id_mikromidas
+  '';
 
   ###### Ollama (local LLM runtime) ######
   services.ollama = {
