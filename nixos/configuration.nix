@@ -179,6 +179,33 @@ in
     '';
   };
 
+  ###### Repo sync (every 5 minutes) ######
+  # Pulls the latest code from GitHub into appDir so changes pushed from the Mac
+  # are picked up without an SSH session to the Pi.
+  systemd.services.novelist-sync = {
+    description = "Pull latest novelist repo";
+    after = [ "network-online.target" "novelist-bootstrap.service" ];
+    wants = [ "network-online.target" "novelist-bootstrap.service" ];
+    path = [ pkgs.git pkgs.openssh ];
+    serviceConfig = {
+      Type = "oneshot";
+      User = novelUser;
+      WorkingDirectory = appDir;
+    };
+    script = ''
+      git -C ${appDir} pull --ff-only
+    '';
+  };
+
+  systemd.timers.novelist-sync = {
+    description = "Pull novelist repo every 5 minutes";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "2m";
+      OnUnitActiveSec = "5m";
+    };
+  };
+
   ###### The daily writing job ######
   # Runs orchestrator/write_chapter.py once a day. It talks to Ollama,
   # writes a new chapter + updates the notebook, then git-pushes.
