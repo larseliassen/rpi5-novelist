@@ -203,6 +203,7 @@ in
     timerConfig = {
       OnBootSec = "2m";
       OnUnitActiveSec = "5m";
+      # sync-test-2026-08-26
     };
   };
 
