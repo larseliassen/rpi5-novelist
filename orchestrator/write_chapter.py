@@ -36,6 +36,16 @@ OLLAMA = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 MODEL = os.environ.get("NOVELIST_MODEL", "novelist")
 ROOT = Path(os.environ.get("NOVELIST_DIR", ".")).resolve()
 
+
+def base_model() -> str:
+    """Return the active FROM model from the Modelfile (first non-commented FROM line)."""
+    modelfile = ROOT / "orchestrator" / "modelfile" / "Modelfile"
+    for line in modelfile.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.upper().startswith("FROM") and not stripped.startswith("#"):
+            return stripped.split(None, 1)[1].strip()
+    return MODEL
+
 STATE = ROOT / "state"
 # Chapters are published from a separate PUBLIC repo (larseliassen/mikromidas),
 # because GitHub Pages will not serve a private repo on a free plan. The notebook
@@ -224,6 +234,7 @@ def main() -> int:
         title: "{first_line}"
         chapter: {n}
         date: "{today}"
+        model: "{base_model()}"
         ---
 
     """)

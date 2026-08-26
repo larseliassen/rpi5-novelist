@@ -193,8 +193,14 @@ in
       WorkingDirectory = appDir;
     };
     script = ''
+      before=$(git -C ${appDir} rev-parse HEAD)
       git -C ${appDir} fetch origin
       git -C ${appDir} reset --hard origin/main
+      after=$(git -C ${appDir} rev-parse HEAD)
+      if [ "$before" != "$after" ]; then
+        echo "[sync] Nye commits funnet — starter novelist.service"
+        systemctl start novelist.service || true
+      fi
     '';
   };
 
