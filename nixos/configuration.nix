@@ -193,7 +193,8 @@ in
       WorkingDirectory = appDir;
     };
     script = ''
-      git -C ${appDir} pull --ff-only
+      git -C ${appDir} fetch origin
+      git -C ${appDir} reset --hard origin/main
     '';
   };
 
