@@ -246,7 +246,13 @@ in
         systemd-run --collect --unit=novelist-rebuild \
           --setenv=PATH=/run/current-system/sw/bin --setenv=HOME=/root \
           /run/current-system/sw/bin/nixos-rebuild switch --flake ${appDir}#novelist
-      elif echo "$changed" | grep -qE '^orchestrator/'; then
+      fi
+
+      # A push is also a request for a chapter: any change other than the Pi's own
+      # notebook commit coming back around means a human touched the story machine
+      # and wants to see the result now, not at tomorrow's timer. `start` on an
+      # already-running unit is a no-op, so a rebuild + push cannot double-write.
+      if echo "$changed" | grep -vE '^state/' | grep -q .; then
         echo "[sync] Nye commits funnet — starter novelist.service"
         systemctl start --no-block novelist.service
       fi

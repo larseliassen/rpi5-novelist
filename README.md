@@ -89,10 +89,15 @@ fetches this repo every 5 minutes and *applies* what it finds:
 | what you changed | what the Pi does |
 | --- | --- |
 | `nixos/`, `flake.nix`, `flake.lock` | `nixos-rebuild switch` (as a detached `novelist-rebuild` unit) |
-| `orchestrator/` | starts `novelist.service` — writes a chapter now |
-| anything else | just updates the checkout |
+| `state/` only | just updates the checkout — that's the Pi's own notebook commit coming back |
+| anything else (incl. `orchestrator/`) | starts `novelist.service` — writes a chapter now |
 
-So a push is the deploy. Two consequences worth knowing:
+So a push is the deploy — and, for anything outside `state/`, also a chapter. That
+last part is deliberate (edit a prompt, push, read the result) but it is not free:
+each chapter is ~15 minutes of Pi CPU. Batch trivial edits, or push them as a
+`state/`-only commit if you just want the checkout updated.
+
+Two more consequences worth knowing:
 
 - A config that fails to **build** leaves the Pi on its current generation and the
   error in `journalctl -u novelist-rebuild`. One that builds but breaks *booting*

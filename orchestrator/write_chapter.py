@@ -24,9 +24,11 @@ Chapters are written to $NOVELIST_CHAPTERS_DIR (the public site repo), not here:
 
 import json
 import os
+import platform
 import re
 import sys
 import textwrap
+import time
 import datetime as dt
 from pathlib import Path
 
@@ -68,9 +70,15 @@ DIRECTOR_BEATS = [
 ]
 
 
-def ollama_generate(prompt: str, system: str | None = None,
-                    temperature: float = 0.85, num_predict: int = 1600) -> str:
-    """One-shot generation against Ollama's /api/generate."""
+def ollama_call(prompt: str, system: str | None = None,
+                temperature: float = 0.85, num_predict: int = 1600) -> dict:
+    """One-shot generation against Ollama's /api/generate.
+
+    Returns the raw response body. Besides "response" it carries the timing
+    counters (total_duration, eval_count, eval_duration, ... — all in ns) that
+    end up in the chapter's frontmatter, plus a wall-clock "_wall_seconds" in
+    case an older Ollama leaves the counters out.
+    """
     payload = {
         "model": MODEL,
         "prompt": prompt,
@@ -82,9 +90,43 @@ def ollama_generate(prompt: str, system: str | None = None,
     }
     if system:
         payload["system"] = system
+    started = time.monotonic()
     r = requests.post(f"{OLLAMA}/api/generate", json=payload, timeout=3 * 3600)
     r.raise_for_status()
-    return r.json().get("response", "").strip()
+    body = r.json()
+    body["_wall_seconds"] = time.monotonic() - started
+    return body
+
+
+def ollama_generate(prompt: str, system: str | None = None,
+                    temperature: float = 0.85, num_predict: int = 1600) -> str:
+    """ollama_call, for the callers that only want the text."""
+    return ollama_call(prompt, system, temperature, num_predict).get("response", "").strip()
+
+
+def generation_stats(body: dict) -> dict:
+    """Frontmatter-ready numbers from an /api/generate response.
+
+    Ollama reports durations in nanoseconds; tokens/s is computed from the eval
+    phase alone (that is the generation speed — model load and prompt ingestion
+    are reported separately so a cold start does not look like a slow model).
+    """
+    ns = 1_000_000_000
+
+    def secs(key: str) -> float | None:
+        v = body.get(key)
+        return round(v / ns, 1) if isinstance(v, (int, float)) else None
+
+    stats = {
+        "seconds": secs("total_duration") or round(body["_wall_seconds"], 1),
+        "load_seconds": secs("load_duration"),
+        "prompt_tokens": body.get("prompt_eval_count"),
+        "tokens": body.get("eval_count"),
+    }
+    eval_ns, eval_count = body.get("eval_duration"), body.get("eval_count")
+    if eval_ns and eval_count:
+        stats["tokens_per_second"] = round(eval_count / (eval_ns / ns), 2)
+    return {k: v for k, v in stats.items() if v is not None}
 
 
 def read(path: Path, default: str = "") -> str:
@@ -222,22 +264,36 @@ def main() -> int:
     today = dt.date.today().isoformat()
 
     print(f"[write] Kapittel {n} — føring: {beat}")
-    chapter = ollama_generate(build_chapter_prompt(n, beat), num_predict=2600)
+    body = ollama_call(build_chapter_prompt(n, beat), num_predict=2600)
+    chapter = body.get("response", "").strip()
     if not chapter:
         print("[error] Tomt svar fra modellen.", file=sys.stderr)
         return 1
 
-    # Try to lift a chapter title from the first line for nicer frontmatter.
-    first_line = chapter.splitlines()[0].strip("# ").strip()
-    fm = textwrap.dedent(f"""\
-        ---
-        title: "{first_line}"
-        chapter: {n}
-        date: "{today}"
-        model: "{base_model()}"
-        ---
+    stats = generation_stats(body)
+    print("[write] " + ", ".join(f"{k}={v}" for k, v in stats.items()))
 
-    """)
+    # Try to lift a chapter title from the first line for nicer frontmatter.
+    # The model picks the title, so quote-escape it: one stray " would otherwise
+    # break the YAML and take the whole page down with it.
+    first_line = chapter.splitlines()[0].strip("# ").strip().replace('"', "'")
+    # generation:* is machine-written bookkeeping: how long this chapter took,
+    # on what. Handy when swapping models — the site can show "skrevet på 14 min
+    # av qwen2.5:7b" and old chapters keep the numbers they were written with.
+    lines = [
+        "---",
+        f'title: "{first_line}"',
+        f"chapter: {n}",
+        f'date: "{today}"',
+        f'model: "{base_model()}"',
+        "generation:",
+        f'  finished_at: "{dt.datetime.now().astimezone().isoformat(timespec="seconds")}"',
+        f'  host: "{platform.node()}"',
+        f'  beat: "{beat}"',
+    ]
+    lines += [f"  {k}: {v}" for k, v in stats.items()]
+    lines += ["---", ""]
+    fm = "\n".join(lines) + "\n"
     out_path = CHAPTERS / f"kapittel-{n:03d}.md"
     write(out_path, fm + chapter)
     print(f"[write] Lagret {out_path}")
