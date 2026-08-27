@@ -40,6 +40,7 @@ in
   hardware.enableRedistributableFirmware = true;
 
   networking.hostName = "novelist";
+  # A push that touches this file must land on the Pi by itself; see novelist-sync.
 
   ###### Wi-Fi ######
   # The PSK is a secret, so it is NOT stored in this (public) repo. wpa_supplicant
