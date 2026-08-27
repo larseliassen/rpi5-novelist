@@ -182,24 +182,60 @@ in
   ###### Repo sync (every 5 minutes) ######
   # Pulls the latest code from GitHub into appDir so changes pushed from the Mac
   # are picked up without an SSH session to the Pi.
+  #
+  # Pulling the files is only half the job: anything under nixos/ or flake.* is
+  # inert until `nixos-rebuild switch` runs. Without that step a broken sync unit
+  # can never repair itself — the fix sits on disk, unapplied, forever.
+  #
+  # Runs as root (it must call systemctl and nixos-rebuild); the git half drops to
+  # ${novelUser} via runuser so the checkout does not acquire root-owned files and
+  # ssh still finds the deploy key.
   systemd.services.novelist-sync = {
-    description = "Pull latest novelist repo";
+    description = "Pull latest novelist repo and apply it";
     after = [ "network-online.target" "novelist-bootstrap.service" ];
     wants = [ "network-online.target" "novelist-bootstrap.service" ];
-    path = [ pkgs.git pkgs.openssh ];
+    path = [ pkgs.git pkgs.openssh pkgs.util-linux ];
     serviceConfig = {
       Type = "oneshot";
-      User = novelUser;
       WorkingDirectory = appDir;
     };
     script = ''
-      before=$(git -C ${appDir} rev-parse HEAD)
-      git -C ${appDir} fetch origin
-      git -C ${appDir} reset --hard origin/main
-      after=$(git -C ${appDir} rev-parse HEAD)
-      if [ "$before" != "$after" ]; then
+      as_novelist() {
+        runuser -u ${novelUser} -- env HOME=/home/${novelUser} "$@"
+      }
+
+      # A half-finished merge/rebase (run.sh does `pull --rebase --autostash` in
+      # this same checkout) wedges every later sync. Clear it before fetching.
+      as_novelist git -C ${appDir} merge --abort 2>/dev/null || true
+      as_novelist git -C ${appDir} rebase --abort 2>/dev/null || true
+
+      before=$(as_novelist git -C ${appDir} rev-parse HEAD)
+      as_novelist git -C ${appDir} fetch origin
+      after=$(as_novelist git -C ${appDir} rev-parse origin/main)
+      if [ "$before" = "$after" ]; then
+        exit 0
+      fi
+
+      # Local commits here are the daily notebook push; if one never made it to
+      # GitHub, reset --hard would erase the story's memory. Bail out instead.
+      if [ -n "$(as_novelist git -C ${appDir} log --oneline origin/main..HEAD)" ]; then
+        echo "[sync] Lokale commits er ikke pushet — hopper over reset."
+        exit 0
+      fi
+
+      changed=$(as_novelist git -C ${appDir} diff --name-only "$before" "$after")
+      as_novelist git -C ${appDir} reset --hard origin/main
+
+      if echo "$changed" | grep -qE '^(nixos/|flake\.(nix|lock)$)'; then
+        echo "[sync] NixOS-konfigurasjonen er endret — bygger om systemet."
+        # Detached: `switch` restarts novelist-sync.service, which would otherwise
+        # kill this very script partway through the rebuild.
+        systemd-run --collect --unit=novelist-rebuild \
+          --setenv=PATH=/run/current-system/sw/bin --setenv=HOME=/root \
+          /run/current-system/sw/bin/nixos-rebuild switch --flake ${appDir}#novelist
+      elif echo "$changed" | grep -qE '^orchestrator/'; then
         echo "[sync] Nye commits funnet — starter novelist.service"
-        systemctl start novelist.service || true
+        systemctl start --no-block novelist.service
       fi
     '';
   };
@@ -210,7 +246,6 @@ in
     timerConfig = {
       OnBootSec = "2m";
       OnUnitActiveSec = "5m";
-      # sync-test-2026-08-26
     };
   };
 
