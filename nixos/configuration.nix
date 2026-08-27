@@ -142,6 +142,15 @@ in
     RestartSec = "10s";
   };
 
+  # The self-updating rebuild evaluates a flake in ${appDir}, which ${novelUser}
+  # owns, while nix itself runs as root. libgit2 rejects that outright
+  # ("repository path is not owned by current user"), so the ownership has to be
+  # declared safe system-wide — /etc/gitconfig is what both git and libgit2 read.
+  programs.git = {
+    enable = true;
+    config.safe.directory = [ appDir webDir ];
+  };
+
   ###### Packages ######
   environment.systemPackages = with pkgs; [
     git
