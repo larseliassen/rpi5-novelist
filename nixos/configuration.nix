@@ -40,7 +40,7 @@ in
   hardware.enableRedistributableFirmware = true;
 
   networking.hostName = "novelist";
-  # A push that touches this file must land on the Pi by itself; see novelist-sync.
+  # A push that touches this file lands on the Pi by itself; see novelist-sync.
 
   ###### Wi-Fi ######
   # The PSK is a secret, so it is NOT stored in this (public) repo. wpa_supplicant
@@ -158,6 +158,9 @@ in
     jq
     curl
     vim
+    # Inference pins all four cores for hours; htop is how you tell a slow
+    # chapter apart from a wedged one without guessing.
+    htop
   ];
 
   ###### First-boot bootstrap ######
