@@ -81,6 +81,26 @@ Edit `nixos/configuration.nix` before step 4 to set your own SSH public key, the
 > **aarch64-linux** builder (a cloud ARM box, another Pi, or a Linux VM), then
 > `dd` the result to the card. Same config either way.
 
+### After that: push, don't ssh
+
+Step 4 is the only manual `nixos-rebuild`. From then on the `novelist-sync` timer
+fetches this repo every 5 minutes and *applies* what it finds:
+
+| what you changed | what the Pi does |
+| --- | --- |
+| `nixos/`, `flake.nix`, `flake.lock` | `nixos-rebuild switch` (as a detached `novelist-rebuild` unit) |
+| `orchestrator/` | starts `novelist.service` — writes a chapter now |
+| anything else | just updates the checkout |
+
+So a push is the deploy. Two consequences worth knowing:
+
+- A config that fails to **build** leaves the Pi on its current generation and the
+  error in `journalctl -u novelist-rebuild`. One that builds but breaks *booting*
+  needs the extlinux generation menu on a monitor — there is no remote rollback.
+- The sync `reset --hard`s the checkout, but **skips** the reset when local commits
+  are unpushed, so a failed notebook push is never silently erased. If the Pi ever
+  looks stuck at an old commit, that's the first thing to check.
+
 ## 2. First-time app setup on the Pi
 
 **Deploy keys are per-repo**, so the Pi needs *two* — one for this private repo
