@@ -8,6 +8,9 @@ novel**, one chapter per day, with a **local LLM** via Ollama.
 - Coherence over many chapters comes from a **compressed notebook** (synopsis,
   characters, clues, timeline, rolling recap) — not from stuffing old chapters
   into the tiny context window.
+- Chapters are **drafted in English and translated to bokmål** in a second pass.
+  At 2B, composing in Norwegian produces Danish/Swedish soup; translating *into*
+  Norwegian is a much easier task than writing in it. See §3.
 - Runs **forever-ish**: a new chapter every morning at 06:00 Europe/Oslo.
 
 ## Two repos
@@ -29,9 +32,10 @@ rpi5-novelist/                 -> cloned to /var/lib/novelist
 ├── nixos/configuration.nix    # ollama + daily systemd timer + user
 ├── orchestrator/
 │   ├── modelfile/Modelfile    # builds the `novelist` Ollama model
-│   ├── write_chapter.py       # the brain: writes + updates notebook
+│   ├── write_chapter.py       # the brain: draft (en) → translate (nb) → notebook
 │   └── run.sh                 # daily entrypoint (write → push to both repos)
 └── state/                     # the compressed notebook (git-tracked, private)
+    └── drafts/                # the English draft behind each published chapter
 
 mikromidas/                    -> cloned to /var/lib/novelist-web
 ├── chapters/                  # kapittel-NNN.md, written by the Pi
@@ -94,7 +98,7 @@ fetches this repo every 5 minutes and *applies* what it finds:
 
 So a push is the deploy — and, for anything outside `state/`, also a chapter. That
 last part is deliberate (edit a prompt, push, read the result) but it is not free:
-each chapter is ~15 minutes of Pi CPU. Batch trivial edits, or push them as a
+each chapter is ~10–20 minutes of Pi CPU. Batch trivial edits, or push them as a
 `state/`-only commit if you just want the checkout updated.
 
 Two more consequences worth knowing:
@@ -165,12 +169,33 @@ Measured on the actual hardware, same prompt (`num_ctx 4096`) for each:
 | `gemma3:4b` | 3.3GB | no | OOM at load |
 | `llama3.2:3b-instruct-q8_0` | 3.4GB | no | OOM at load |
 
-Two lessons worth keeping:
+Three lessons worth keeping:
 
 - **Anything over ~3GB of weights is OOM-killed at load** on this board.
 - **Aggressive quantization wrecks non-English far faster than English.** A 7B at
   Q3 is *worse* at Norwegian than a 2B at Q4, so "shrink the big model" is a dead
   end here — Q2 is worse still. Pick a smaller model, not a coarser quant.
+- **Don't ask a small model to compose in Norwegian at all.** Every model in the
+  table is markedly better in English, so the pipeline drafts in English and
+  translates as a separate pass. That is the single largest quality lever
+  available at this RAM budget — larger than any swap within the table.
+
+### The two-language pipeline
+
+Per chapter: one English draft call, N translation calls, one notebook call.
+
+The translation is chunked paragraph-by-paragraph because `num_ctx` is 4096 and
+a whole chapter plus its translation does not fit — Ollama would truncate
+silently and publish half a chapter. Chunks never cross a paragraph boundary: cut
+mid-sentence, the model *finishes* the thought instead of translating it. The
+notebook stays in **English** (it is internal scaffolding that only ever feeds
+the English prompt) and self-migrates, since every run rewrites all four
+sections. `state/drafts/kapittel-NNN.en.md` keeps each English draft — the only
+way to tell a bad chapter from a bad translation.
+
+Each published chapter records what it cost in its frontmatter under
+`generation:` — wall time split between `write:` and `translate:`, token counts,
+tok/s, and the director beat it was given.
 
 Repeated OOMs will hang the board hard enough to need a physical power cycle, so
 `configuration.nix` caps `ollama.service` with `MemoryMax` and pins
@@ -187,7 +212,8 @@ The interesting models come back into range — try these first:
 - Avoid the *base* NorMistral "warm" model — it's a completion model and ignores
   instructions.
 
-A full chapter is ~20–40 min at these speeds; fine for a once-daily job.
+A full chapter is ~20–40 min at these speeds (draft + translation); fine for a
+once-daily job, and `TimeoutStartSec` is 3h.
 `num_ctx` is deliberately small (4096) because memory lives in the notebook.
 
 ## 4. The website
@@ -200,8 +226,16 @@ Pi pushes rebuilds the site automatically; nothing here needs to change.
 
 ## Tuning the story
 
-- **Pace / payoffs:** edit `DIRECTOR_BEATS` in `write_chapter.py`.
-- **Voice / rules:** edit the `SYSTEM` block in the Modelfile.
+- **Pace / payoffs:** edit `DIRECTOR_BEATS` in `write_chapter.py` (English — they
+  go into the drafting prompt).
+- **Voice / rules:** edit the `SYSTEM` block in the Modelfile. That is the
+  *drafting* persona; `TRANSLATOR_SYSTEM` and `EDITOR_SYSTEM` in
+  `write_chapter.py` override it for the other two passes.
+- **Norwegian style:** the translation prompt in `translate_chapter()` — dialogue
+  convention, register, how literal to be.
 - **Reset the novel:** delete `state/` here and `chapters/` in `mikromidas`; the
   next run bootstraps a fresh premise.
-- **Chapter length:** `num_predict` in `write_chapter.py` (~2600 ≈ 1500–2200 words).
+- **Chapter length:** the word count in `build_chapter_prompt()` (500) and
+  `num_predict` on the draft call (900).
+  Raising it much past that overflows `num_ctx 4096` once the notebook prompt is
+  in front of it, and the overflow is silent.

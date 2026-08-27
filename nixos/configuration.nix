@@ -272,7 +272,7 @@ in
   # Runs orchestrator/write_chapter.py once a day. It talks to Ollama,
   # writes a new chapter + updates the notebook, then git-pushes.
   systemd.services.novelist = {
-    description = "Write one crime-novel chapter (Norwegian)";
+    description = "Write one crime-novel chapter (drafted in English, published in bokmål)";
     after = [ "network-online.target" "ollama.service" "novelist-bootstrap.service" ];
     wants = [ "network-online.target" "ollama.service" "novelist-bootstrap.service" ];
     # openssh: run.sh does `git push` over a git@ remote (see novelist-bootstrap).

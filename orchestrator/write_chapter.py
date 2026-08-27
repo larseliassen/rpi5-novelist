@@ -1,22 +1,35 @@
 #!/usr/bin/env python3
 """
-Daily crime-novel chapter generator (Norwegian / bokmål).
+Daily crime-novel chapter generator. Drafts in English, publishes in bokmål.
 
-Design goals for an RPi5 8GB running a 7B model with a small context window:
-  * NEVER stuff old chapters into the prompt. Keep a compressed "notatbok".
-  * Two LLM calls per day:
-       1) write the next chapter from (notebook + last recap + a director beat)
-       2) update the notebook from the new chapter (facts, deaths, clues, timeline)
-  * Improvised mystery: a light "regissor" injects escalating beats so the story
+Design goals for a 4GB RPi5 running a 2B model at num_ctx 4096:
+  * NEVER stuff old chapters into the prompt. Keep a compressed notebook.
+  * Write in ENGLISH, then translate. A 2B model's Norwegian is a
+    Scandinavian soup of Danish and Swedish loanwords, but its English prose is
+    passable and translation is a far easier task than composition. So the
+    creative work happens in English and only the last step is Norwegian.
+  * The notebook is English too: it is internal scaffolding that only ever feeds
+    the English writing prompt. It self-migrates — update_notebook rewrites all
+    four sections every run, so the first English chapter converts it.
+  * Improvised mystery: a light "director" injects escalating beats so the story
     builds tension and eventually converges instead of wandering forever.
+
+Per chapter that is: 1 write call + N translate calls + 1 notebook call.
+
+The 4096-token context is the binding constraint. A whole chapter cannot be
+translated in one call — source plus output would overflow and Ollama would
+silently truncate, publishing half a chapter. Hence translate_chapter() works
+paragraph by paragraph. The chapter target is 500 words, which leaves the draft
+call comfortably inside the window.
 
 State layout (all markdown/json, git-friendly):
   state/synopsis.md      one paragraph, drifts slowly
   state/characters.md    who they are, alive/dead, what they know
   state/clues.md         planted facts + red herrings
   state/timeline.md      what happened when
-  state/recap.md         rolling ~300-word "historien så langt"
+  state/recap.md         rolling ~250-word "story so far"
   state/meta.json        {chapter_count, ...}
+  state/drafts/          the English draft of each chapter, kept for comparison
 
 Chapters are written to $NOVELIST_CHAPTERS_DIR (the public site repo), not here:
   <public repo>/chapters/kapittel-NN.md
@@ -59,15 +72,29 @@ CHAPTERS = Path(os.environ.get("NOVELIST_CHAPTERS_DIR", ROOT / "chapters")).reso
 # The loop cycles through these so an "improvised" mystery still escalates and
 # periodically pays things off, instead of meandering forever.
 DIRECTOR_BEATS = [
-    "Introduser en ny detalj som ikke stemmer med det etterforskeren trodde.",
-    "La en biperson oppføre seg mistenkelig. Ikke avslør hvorfor ennå.",
-    "Grav fram et spor fra et tidligere kapittel og gi det ny betydning.",
-    "Øk presset: en trussel, en frist, eller noe personlig står på spill.",
-    "La et tidligere spor vise seg å være villedende (rød sild).",
-    "Avdekk en hemmelighet om en av hovedpersonene.",
-    "En vending: noen leseren stolte på, viser en ny side.",
-    "Bind sammen to tråder som til nå har virket urelaterte.",
+    "Introduce a new detail that contradicts what the investigator believed.",
+    "Let a minor character behave suspiciously. Do not reveal why yet.",
+    "Dig up a clue from an earlier chapter and give it new meaning.",
+    "Raise the pressure: a threat, a deadline, or something personal at stake.",
+    "Reveal that an earlier clue was misleading — a red herring.",
+    "Uncover a secret about one of the main characters.",
+    "A turn: someone the reader trusted shows another side.",
+    "Tie together two threads that have seemed unrelated until now.",
 ]
+
+# The Modelfile's SYSTEM makes the model an English-writing crime novelist, which
+# is right for the chapter call and wrong for the other two. /api/generate's
+# "system" field overrides it per call.
+TRANSLATOR_SYSTEM = (
+    "Du er en litterær oversetter. Du oversetter engelsk skjønnlitteratur til "
+    "korrekt norsk bokmål. Du skriver idiomatisk norsk, aldri ord-for-ord. "
+    "Aldri dansk, aldri svensk, aldri nynorsk. Du svarer KUN med oversettelsen — "
+    "ingen forklaring, ingen kommentar, ingen engelsk originaltekst."
+)
+EDITOR_SYSTEM = (
+    "You are a terse story editor. You maintain a factual continuity notebook. "
+    "You answer only in the requested format, with no commentary."
+)
 
 
 def ollama_call(prompt: str, system: str | None = None,
@@ -129,6 +156,20 @@ def generation_stats(body: dict) -> dict:
     return {k: v for k, v in stats.items() if v is not None}
 
 
+def merge_stats(bodies: list[dict]) -> dict:
+    """Roll the per-chunk translation calls up into one set of numbers."""
+    parts = [generation_stats(b) for b in bodies]
+    total = {"calls": len(parts)}
+    for key in ("seconds", "load_seconds", "prompt_tokens", "tokens"):
+        values = [p[key] for p in parts if key in p]
+        if values:
+            total[key] = round(sum(values), 1) if "seconds" in key else sum(values)
+    total.setdefault("seconds", 0.0)
+    if total.get("tokens") and total.get("seconds"):
+        total["tokens_per_second"] = round(total["tokens"] / total["seconds"], 2)
+    return total
+
+
 def read(path: Path, default: str = "") -> str:
     return path.read_text(encoding="utf-8") if path.exists() else default
 
@@ -154,27 +195,27 @@ def bootstrap_if_empty() -> None:
     if (STATE / "synopsis.md").exists():
         return
     print("[bootstrap] Ingen historie funnet — skaper premiss ...")
+    # English, like the rest of the notebook — except the title, which is the one
+    # bootstrap field that reaches readers untranslated.
     premise_prompt = textwrap.dedent("""\
-        Skap premisset for en ny norsk kriminalroman. Improviser fritt, men gjør det
-        konkret og norsk (stedsnavn, miljø, årstid). Svar KUN med disse feltene:
+        Invent the premise for a new Norwegian crime novel. Improvise freely, but
+        keep it concrete and Norwegian: real place names, a specific setting and
+        season. Answer with ONLY these four labels:
 
-        TITTEL: <en fengende norsk tittel>
-        SYNOPSIS: <ett avsnitt: forbrytelsen, etterforskeren, settingen, tonen>
-        PERSONER: <3-5 personer, hver med navn og én linje. Marker etterforsker.>
-        ÅPNINGSSPOR: <ett konkret spor eller mysterium som starter alt>
+        TITLE: <a striking title, in Norwegian>
+        SYNOPSIS: <one paragraph: the crime, the investigator, the setting, the tone>
+        CHARACTERS: <3-5 people, each a name and one line. Mark the investigator.>
+        OPENING_CLUE: <one concrete clue or mystery that sets everything off>
     """)
     out = ollama_generate(premise_prompt, temperature=0.9, num_predict=700)
+    fields = split_sections(out, ("TITLE", "SYNOPSIS", "CHARACTERS", "OPENING_CLUE"))
 
-    def field(name: str) -> str:
-        m = re.search(rf"{name}:\s*(.+?)(?=\n[A-ZÅØÆ]+:|\Z)", out, re.S)
-        return m.group(1).strip() if m else ""
-
-    title = field("TITTEL") or "Mørketid"
-    write(STATE / "synopsis.md", field("SYNOPSIS") or out)
-    write(STATE / "characters.md", field("PERSONER") or "- Etterforsker: (ukjent)")
-    write(STATE / "clues.md", "- " + (field("ÅPNINGSSPOR") or "Et uforklarlig funn."))
-    write(STATE / "timeline.md", "- Dag 0: Historien begynner.")
-    write(STATE / "recap.md", field("SYNOPSIS") or "Historien har akkurat begynt.")
+    title = fields.get("TITLE", "Mørketid").splitlines()[0].strip()
+    write(STATE / "synopsis.md", fields.get("SYNOPSIS") or out)
+    write(STATE / "characters.md", fields.get("CHARACTERS", "- Investigator: (unknown)"))
+    write(STATE / "clues.md", "- " + fields.get("OPENING_CLUE", "An unexplained find."))
+    write(STATE / "timeline.md", "- Day 0: The story begins.")
+    write(STATE / "recap.md", fields.get("SYNOPSIS", "The story has just begun."))
     meta = load_meta()
     meta["title"] = title
     save_meta(meta)
@@ -183,70 +224,196 @@ def bootstrap_if_empty() -> None:
 
 def build_chapter_prompt(n: int, beat: str) -> str:
     return textwrap.dedent(f"""\
-        NOTATBOK (fakta du MÅ respektere):
+        NOTEBOOK (facts you MUST respect):
 
         # Synopsis
         {read(STATE / 'synopsis.md')}
 
-        # Personer (og hvem som lever/vet hva)
+        # Characters (who is alive, who knows what)
         {read(STATE / 'characters.md')}
 
-        # Spor og røde sild
+        # Clues and red herrings
         {read(STATE / 'clues.md')}
 
-        # Tidslinje
+        # Timeline
         {read(STATE / 'timeline.md')}
 
-        # Historien så langt
+        # Story so far
         {read(STATE / 'recap.md')}
 
         ---
-        OPPGAVE: Skriv KAPITTEL {n} i romanen, på bokmål.
-        Regissørens føring for dette kapittelet: {beat}
+        TASK: Write CHAPTER {n} of the novel, in English.
+        The director's note for this chapter: {beat}
 
-        Skriv 500 ord sammenhengende prosa. Start med kapitteloverskriften
-        på formen "Kapittel {n}". Ikke gjenta notatboka. Avslutt med en krok.
+        The novel is set in Norway and will be published in Norwegian, so keep
+        every proper noun exactly as the notebook spells it — names of people,
+        places, boats, streets. Do not anglicise them.
+
+        Write 500 words of continuous prose. Open with the chapter heading
+        in the form "Chapter {n}". Do not restate the notebook. End on a hook.
     """)
 
 
-def update_notebook(n: int, chapter_text: str) -> None:
-    """Second pass: fold the new chapter back into the compressed state."""
-    prompt = textwrap.dedent(f"""\
-        Her er notatboka og et nytt kapittel. Oppdater notatboka så den forblir
-        kort, presis og uten motsigelser. Svar KUN med disse seksjonene, hver
-        som en kort punktliste (unntatt RECAP som er ett avsnitt på ~250 ord):
+def split_for_translation(text: str, budget: int = 900) -> list[str]:
+    """Split a chapter into paragraph groups small enough to translate in one call.
 
-        PERSONER:
-        SPOR:
-        TIDSLINJE:
+    The 4096-token context has to hold the source chunk, the instructions, the
+    name glossary AND the Norwegian output, so chunks stay near ~900 characters.
+    Paragraph boundaries are never crossed — a chunk that ends mid-sentence makes
+    the model "finish" the thought instead of translating it. A single paragraph
+    longer than the budget is passed through whole rather than cut.
+    """
+    chunks: list[str] = []
+    current: list[str] = []
+    size = 0
+    for para in re.split(r"\n\s*\n", text.strip()):
+        para = para.strip()
+        if not para:
+            continue
+        if current and size + len(para) > budget:
+            chunks.append("\n\n".join(current))
+            current, size = [], 0
+        current.append(para)
+        size += len(para)
+    if current:
+        chunks.append("\n\n".join(current))
+    return chunks
+
+
+# Small models like to introduce themselves before doing the work. Strip the
+# usual openers so they never reach the published page.
+PREAMBLE = re.compile(
+    r"^\s*(here (?:is|'s)[^\n:]*:|translation:|norwegian:|oversettelse:|"
+    r"norsk( oversettelse)?:|på norsk:)\s*",
+    re.I,
+)
+
+
+def translate_chapter(chapter_en: str) -> tuple[str, list[dict]]:
+    """Translate the English draft to bokmål, one paragraph group at a time.
+
+    Returns the Norwegian text and the per-call stats, so the frontmatter can
+    report what the translation pass cost.
+    """
+    # The notebook's character list doubles as a name glossary: it is the only
+    # thing standing between "Elin Johansen" and a helpfully translated "Elin
+    # Johnson", and it keeps spellings stable across chunks.
+    glossary = read(STATE / "characters.md").strip()
+    chunks = split_for_translation(chapter_en)
+    print(f"[translate] {len(chunks)} biter å oversette ...")
+
+    out: list[str] = []
+    stats: list[dict] = []
+    for i, chunk in enumerate(chunks, 1):
+        prompt = textwrap.dedent(f"""\
+            Oversett teksten under til norsk bokmål.
+
+            Egennavn som skal stå UENDRET (personer og steder i romanen):
+            {glossary}
+
+            Regler:
+            - Behold alle avsnittsskift. Ikke slå sammen eller del opp avsnitt.
+            - Ikke legg til noe, ikke utelat noe, ikke oppsummer.
+            - Skriv naturlig, litterær norsk — ikke ord-for-ord.
+            - Dialog settes med norske anførselstegn: «slik».
+            - Svar KUN med den norske teksten.
+
+            === TEKST ===
+            {chunk}
+        """)
+        body = ollama_call(
+            prompt,
+            system=TRANSLATOR_SYSTEM,
+            temperature=0.25,
+            # Norwegian needs more tokens than the English it came from, and this
+            # tokenizer is not kind to it. Budget generously: a truncated chunk
+            # is a hole in the middle of the published chapter.
+            num_predict=min(1400, max(320, int(len(chunk) / 1.4))),
+        )
+        piece = PREAMBLE.sub("", body.get("response", "").strip()).strip()
+        if not piece:
+            # Better a visible English paragraph than a silent gap in the story.
+            print(f"[translate] ADVARSEL: bit {i} kom tom tilbake — beholder engelsk.",
+                  file=sys.stderr)
+            piece = chunk
+        out.append(piece)
+        stats.append(body)
+        print(f"[translate] {i}/{len(chunks)} ferdig")
+    return "\n\n".join(out), stats
+
+
+NOTEBOOK_SECTIONS = ("CHARACTERS", "CLUES", "TIMELINE", "RECAP")
+
+
+def split_sections(out: str, names: tuple[str, ...]) -> dict[str, str]:
+    """Pull LABEL: blocks out of a model response.
+
+    Tolerant of the markdown the model decorates its labels with — it answers
+    "## CLUES:" or "**CLUES:**" at least as often as the bare "CLUES:" it was
+    asked for. Matching only the bare form is why state/ currently has "## SPOR:"
+    embedded in the middle of characters.md and the whole premise stuffed into
+    meta.json's title: the terminator never matched, so each section swallowed
+    the rest of the response.
+    """
+    # Trailing \** matters as much as the leading one: "**CLUES:**" closes its
+    # bold *after* the colon, and the leftover asterisks would head the section.
+    label = r"^[ \t]*#{0,4}[ \t]*\**[ \t]*(?:%s)[ \t]*\**[ \t]*:[ \t]*\**[ \t]*"
+    found = {}
+    for name in names:
+        start = re.search(label % name, out, re.M | re.I)
+        if not start:
+            continue
+        rest = out[start.end():]
+        end = re.search(label % "|".join(names), rest, re.M | re.I)
+        body = rest[: end.start()] if end else rest
+        body = body.strip()
+        if body:
+            found[name] = body
+    return found
+
+
+def update_notebook(n: int, chapter_en: str) -> dict:
+    """Second pass: fold the new chapter back into the compressed state.
+
+    Fed the ENGLISH draft, not the translation: it is the same content, the model
+    reads it better, and it keeps the notebook in the language the next chapter
+    prompt will be written in.
+    """
+    prompt = textwrap.dedent(f"""\
+        Here is the notebook and a new chapter. Update the notebook so it stays
+        short, precise and free of contradictions. Answer with ONLY these four
+        labels, each followed by a short bullet list (except RECAP, which is one
+        paragraph of about 250 words):
+
+        CHARACTERS:
+        CLUES:
+        TIMELINE:
         RECAP:
 
-        === NÅVÆRENDE NOTATBOK ===
-        Personer:
+        Keep every proper noun spelled exactly as it appears below.
+
+        === CURRENT NOTEBOOK ===
+        Characters:
         {read(STATE / 'characters.md')}
-        Spor:
+        Clues:
         {read(STATE / 'clues.md')}
-        Tidslinje:
+        Timeline:
         {read(STATE / 'timeline.md')}
 
-        === NYTT KAPITTEL {n} ===
-        {chapter_text}
+        === NEW CHAPTER {n} ===
+        {chapter_en}
     """)
-    out = ollama_generate(prompt, temperature=0.3, num_predict=900)
+    body = ollama_call(prompt, system=EDITOR_SYSTEM, temperature=0.3, num_predict=900)
+    sections = split_sections(body.get("response", "").strip(), NOTEBOOK_SECTIONS)
 
-    def section(name: str) -> str:
-        m = re.search(rf"{name}:\s*(.+?)(?=\n(?:PERSONER|SPOR|TIDSLINJE|RECAP):|\Z)",
-                      out, re.S)
-        return m.group(1).strip() if m else ""
-
-    if section("PERSONER"):
-        write(STATE / "characters.md", section("PERSONER"))
-    if section("SPOR"):
-        write(STATE / "clues.md", section("SPOR"))
-    if section("TIDSLINJE"):
-        write(STATE / "timeline.md", section("TIDSLINJE"))
-    if section("RECAP"):
-        write(STATE / "recap.md", section("RECAP"))
+    for name, path in (("CHARACTERS", "characters.md"), ("CLUES", "clues.md"),
+                       ("TIMELINE", "timeline.md"), ("RECAP", "recap.md")):
+        if name in sections:
+            write(STATE / path, sections[name])
+        else:
+            print(f"[state] ADVARSEL: fant ingen {name}-seksjon — beholder forrige.",
+                  file=sys.stderr)
+    return body
 
 
 def slugify(s: str) -> str:
@@ -264,22 +431,40 @@ def main() -> int:
     today = dt.date.today().isoformat()
 
     print(f"[write] Kapittel {n} — føring: {beat}")
-    body = ollama_call(build_chapter_prompt(n, beat), num_predict=2600)
-    chapter = body.get("response", "").strip()
-    if not chapter:
+    # num_predict 900: ~500 English words plus headroom. The notebook prompt sits
+    # in front of it and num_ctx is 4096, so a larger budget is silently truncated.
+    body = ollama_call(build_chapter_prompt(n, beat), num_predict=900)
+    chapter_en = body.get("response", "").strip()
+    if not chapter_en:
         print("[error] Tomt svar fra modellen.", file=sys.stderr)
         return 1
+    write_stats = generation_stats(body)
+    print("[write] " + ", ".join(f"{k}={v}" for k, v in write_stats.items()))
 
-    stats = generation_stats(body)
-    print("[write] " + ", ".join(f"{k}={v}" for k, v in stats.items()))
+    # Keep the draft. It is the only way to tell a bad chapter from a bad
+    # translation, which are very different problems to fix.
+    write(STATE / "drafts" / f"kapittel-{n:03d}.en.md", chapter_en)
 
-    # Try to lift a chapter title from the first line for nicer frontmatter.
-    # The model picks the title, so quote-escape it: one stray " would otherwise
-    # break the YAML and take the whole page down with it.
-    first_line = chapter.splitlines()[0].strip("# ").strip().replace('"', "'")
-    # generation:* is machine-written bookkeeping: how long this chapter took,
-    # on what. Handy when swapping models — the site can show "skrevet på 14 min
-    # av qwen2.5:7b" and old chapters keep the numbers they were written with.
+    chapter_nb, translate_bodies = translate_chapter(chapter_en)
+    translate_stats = merge_stats(translate_bodies)
+    print("[translate] " + ", ".join(f"{k}={v}" for k, v in translate_stats.items()))
+
+    # The heading survives translation as "Kapittel N" if we are lucky and as
+    # "Chapter N" if we are not. Normalise it so the site's chapter list does not
+    # end up bilingual.
+    chapter_nb = re.sub(r"\A\s*#*\s*(?:Chapter|Kapittel)\s+\d+", f"Kapittel {n}",
+                        chapter_nb, count=1, flags=re.I)
+
+    # Lift the title from the heading line. If translation dropped the heading
+    # the first line is just prose, which would make a nonsense title — fall back
+    # to the plain chapter number. Quote-escape either way: one stray " from the
+    # model would break the YAML and take the whole page down with it.
+    first_line = chapter_nb.splitlines()[0].strip("# ").strip().replace('"', "'")
+    if not re.match(rf"^Kapittel\s+{n}\b", first_line):
+        first_line = f"Kapittel {n}"
+    # generation:* is machine-written bookkeeping: how long this chapter took, on
+    # what, and how it split between drafting and translating. Handy when swapping
+    # models — old chapters keep the numbers they were written with.
     lines = [
         "---",
         f'title: "{first_line}"',
@@ -290,16 +475,21 @@ def main() -> int:
         f'  finished_at: "{dt.datetime.now().astimezone().isoformat(timespec="seconds")}"',
         f'  host: "{platform.node()}"',
         f'  beat: "{beat}"',
+        '  pipeline: "en -> nb"',
+        f'  seconds: {round(write_stats["seconds"] + translate_stats["seconds"], 1)}',
+        "  write:",
     ]
-    lines += [f"  {k}: {v}" for k, v in stats.items()]
+    lines += [f"    {k}: {v}" for k, v in write_stats.items()]
+    lines += ["  translate:"]
+    lines += [f"    {k}: {v}" for k, v in translate_stats.items()]
     lines += ["---", ""]
     fm = "\n".join(lines) + "\n"
     out_path = CHAPTERS / f"kapittel-{n:03d}.md"
-    write(out_path, fm + chapter)
+    write(out_path, fm + chapter_nb)
     print(f"[write] Lagret {out_path}")
 
     print("[state] Oppdaterer notatboka ...")
-    update_notebook(n, chapter)
+    update_notebook(n, chapter_en)
 
     meta["chapter_count"] = n
     meta["last_written"] = today
