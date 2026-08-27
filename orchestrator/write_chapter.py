@@ -204,7 +204,7 @@ def build_chapter_prompt(n: int, beat: str) -> str:
         OPPGAVE: Skriv KAPITTEL {n} i romanen, på bokmål.
         Regissørens føring for dette kapittelet: {beat}
 
-        Skriv 1200-2200 ord sammenhengende prosa. Start med kapitteloverskriften
+        Skriv 500 ord sammenhengende prosa. Start med kapitteloverskriften
         på formen "Kapittel {n}". Ikke gjenta notatboka. Avslutt med en krok.
     """)
 
