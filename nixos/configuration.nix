@@ -288,6 +288,14 @@ in
       Environment = [
         "OLLAMA_HOST=http://127.0.0.1:11434"
         "NOVELIST_MODEL=novelist"        # the Modelfile-built model name
+        # Translation runs on a Norwegian-specialised model; drafting stays on
+        # the novelist model. NorMistral would be the better translator but its smallest
+        # GGUF is 3.3GB, over the MemoryMax below. Borealis is Gemma-3 based and
+        # Norwegian-centric, and this is the *text* GGUF at Q4_K_M = 2.49GB. Do not
+        # swap it for the ollama.com tag NbAiLab/borealis-instruct-preview:4b —
+        # that one bundles an 851MB vision projector we never use, totals 3.3GB,
+        # and gets cgroup-killed at load.
+        "NOVELIST_TRANSLATE_MODEL=hf.co/NbAiLab/borealis-4b-instruct-preview-gguf:Q4_K_M"
         "NOVELIST_DIR=${appDir}"
         "NOVELIST_WEB_DIR=${webDir}"     # public repo: chapters get written here
       ];

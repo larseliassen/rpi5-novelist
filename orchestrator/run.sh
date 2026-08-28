@@ -21,6 +21,19 @@ export NOVELIST_CHAPTERS_DIR="${WEB_DIR}/chapters"
 echo "[run] Bygger modell '${MODEL}' fra Modelfile ..."
 ollama create "${MODEL}" -f orchestrator/modelfile/Modelfile
 
+# The translator, when it is a different model, is used as pulled — its prompt
+# and sampling settings are passed per call from write_chapter.py, so it needs no
+# Modelfile of its own. Pulling is a no-op once the weights are on disk. A failure
+# here must not abort the run: write_chapter.py falls back to ${MODEL}.
+TRANSLATE_MODEL="${NOVELIST_TRANSLATE_MODEL:-}"
+if [ -n "${TRANSLATE_MODEL}" ] && [ "${TRANSLATE_MODEL}" != "${MODEL}" ]; then
+  echo "[run] Henter oversettermodell '${TRANSLATE_MODEL}' ..."
+  if ! ollama pull "${TRANSLATE_MODEL}"; then
+    echo "[run] ADVARSEL: kunne ikke hente ${TRANSLATE_MODEL}; bruker ${MODEL}."
+    export NOVELIST_TRANSLATE_MODEL="${MODEL}"
+  fi
+fi
+
 # Refresh the public checkout before writing into it, so the new chapter lands on
 # top of whatever is already published rather than colliding with it at push time.
 if [ -d "${WEB_DIR}/.git" ]; then

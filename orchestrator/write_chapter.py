@@ -49,6 +49,11 @@ import requests
 
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 MODEL = os.environ.get("NOVELIST_MODEL", "novelist")
+# The translation pass may use a different, Norwegian-specialised model. Defaults
+# to MODEL, so leaving it unset keeps the single-model pipeline. Only ever one
+# model is resident (OLLAMA_MAX_LOADED_MODELS=1), so peak RAM is the larger of
+# the two, not their sum — but each switch reloads weights from the SD card.
+TRANSLATE_MODEL = os.environ.get("NOVELIST_TRANSLATE_MODEL") or MODEL
 ROOT = Path(os.environ.get("NOVELIST_DIR", ".")).resolve()
 
 
@@ -98,21 +103,27 @@ EDITOR_SYSTEM = (
 
 
 def ollama_call(prompt: str, system: str | None = None,
-                temperature: float = 0.85, num_predict: int = 1600) -> dict:
+                temperature: float = 0.85, num_predict: int = 1600,
+                model: str | None = None, options: dict | None = None) -> dict:
     """One-shot generation against Ollama's /api/generate.
 
     Returns the raw response body. Besides "response" it carries the timing
     counters (total_duration, eval_count, eval_duration, ... — all in ns) that
     end up in the chapter's frontmatter, plus a wall-clock "_wall_seconds" in
     case an older Ollama leaves the counters out.
+
+    `options` is merged over the defaults. The translator needs it: a model
+    pulled straight from a registry has no Modelfile of ours, so its num_ctx and
+    sampling settings have to be set per call rather than baked in.
     """
     payload = {
-        "model": MODEL,
+        "model": model or MODEL,
         "prompt": prompt,
         "stream": False,
         "options": {
             "temperature": temperature,
             "num_predict": num_predict,
+            **(options or {}),
         },
     }
     if system:
@@ -329,6 +340,13 @@ def translate_chapter(chapter_en: str) -> tuple[str, list[dict]]:
             # tokenizer is not kind to it. Budget generously: a truncated chunk
             # is a hole in the middle of the published chapter.
             num_predict=min(1400, max(320, int(len(chunk) / 1.4))),
+            model=TRANSLATE_MODEL,
+            # Set explicitly rather than relying on the model's own defaults: a
+            # registry pull often ships num_ctx 2048, which would silently clip
+            # the glossary off the front of the prompt. repeat_penalty is dropped
+            # to 1.0 because translation legitimately repeats — names, refrains,
+            # sentence rhythm — and penalising that makes the model paraphrase.
+            options={"num_ctx": 4096, "repeat_penalty": 1.0},
         )
         piece = PREAMBLE.sub("", body.get("response", "").strip()).strip()
         if not piece:
@@ -476,6 +494,7 @@ def main() -> int:
         f'  host: "{platform.node()}"',
         f'  beat: "{beat}"',
         '  pipeline: "en -> nb"',
+        f'  translate_model: "{TRANSLATE_MODEL}"',
         f'  seconds: {round(write_stats["seconds"] + translate_stats["seconds"], 1)}',
         "  write:",
     ]

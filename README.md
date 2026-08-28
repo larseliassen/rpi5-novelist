@@ -148,8 +148,9 @@ sudo systemctl start novelist.service
 journalctl -u novelist.service -f
 ```
 
-The model is built from the Modelfile automatically on every run, so there is no
-manual `ollama pull` / `ollama create` step.
+The drafting model is built from the Modelfile on every run and the translation
+model is pulled if missing, so there is no manual `ollama pull` / `ollama create`
+step. The first run after changing the translator downloads ~2.5GB.
 
 ## 3. Choosing the model (Norwegian quality vs. RAM)
 
@@ -183,6 +184,22 @@ Three lessons worth keeping:
 ### The two-language pipeline
 
 Per chapter: one English draft call, N translation calls, one notebook call.
+Drafting and the notebook run on `novelist` (gemma2:2b); **translation runs on a
+separate, Norwegian-specialised model** set by `NOVELIST_TRANSLATE_MODEL`. Only
+one model is resident at a time (`OLLAMA_MAX_LOADED_MODELS=1`), so peak RAM is
+the larger of the two rather than their sum — the cost is two reloads from the SD
+card per chapter, visible as `load_seconds` in the frontmatter.
+
+Current translator: **Borealis 4B** (`hf.co/NbAiLab/borealis-4b-instruct-preview-gguf:Q4_K_M`,
+2.49GB), the National Library's Norwegian-centric Gemma 3. Two traps:
+
+- **NorMistral does not fit.** It is the better translator — the Borealis authors
+  say so themselves — but the family is 7B/11B only and the smallest GGUF
+  (Q3_K_M) is 3.28–3.52GB, over `MemoryMax`. Q3 is also the quant level measured
+  above as destroying Norwegian. It becomes the obvious choice on an 8GB board.
+- **Do not use the ollama.com tag** `NbAiLab/borealis-instruct-preview:4b`. It
+  bundles an 851MB CLIP vision projector we never use, totalling 3.3GB, and is
+  cgroup-killed at load. The `hf.co/...-gguf:Q4_K_M` build above is text-only.
 
 The translation is chunked paragraph-by-paragraph because `num_ctx` is 4096 and
 a whole chapter plus its translation does not fit — Ollama would truncate
