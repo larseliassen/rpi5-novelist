@@ -260,6 +260,10 @@ def build_chapter_prompt(n: int, beat: str) -> str:
         every proper noun exactly as the notebook spells it — names of people,
         places, boats, streets. Do not anglicise them.
 
+        Something must HAPPEN: at least one concrete, externally visible event —
+        a discovery, an admission, an arrival, a lie caught. Atmosphere alone is
+        not a chapter, and the notebook has nothing to record after one.
+
         Write 500 words of continuous prose. Open with the chapter heading
         in the form "Chapter {n}". Do not restate the notebook. End on a hook.
     """)
@@ -381,9 +385,6 @@ def translate_chapter(chapter_en: str) -> tuple[str, list[dict]]:
     return "\n\n".join(out), stats
 
 
-NOTEBOOK_SECTIONS = ("CHARACTERS", "CLUES", "TIMELINE", "RECAP")
-
-
 def split_sections(out: str, names: tuple[str, ...]) -> dict[str, str]:
     """Pull LABEL: blocks out of a model response.
 
@@ -393,22 +394,96 @@ def split_sections(out: str, names: tuple[str, ...]) -> dict[str, str]:
     embedded in the middle of characters.md and the whole premise stuffed into
     meta.json's title: the terminator never matched, so each section swallowed
     the rest of the response.
+
+    A label may occur more than once — the model likes to echo the whole label
+    list back as an empty template before filling it in. Take the first
+    occurrence that actually has something under it.
     """
     # Trailing \** matters as much as the leading one: "**CLUES:**" closes its
     # bold *after* the colon, and the leftover asterisks would head the section.
     label = r"^[ \t]*#{0,4}[ \t]*\**[ \t]*(?:%s)[ \t]*\**[ \t]*:[ \t]*\**[ \t]*"
+    any_label = re.compile(label % "|".join(names), re.M | re.I)
     found = {}
     for name in names:
-        start = re.search(label % name, out, re.M | re.I)
-        if not start:
-            continue
-        rest = out[start.end():]
-        end = re.search(label % "|".join(names), rest, re.M | re.I)
-        body = rest[: end.start()] if end else rest
-        body = body.strip()
-        if body:
-            found[name] = body
+        for start in re.finditer(label % name, out, re.M | re.I):
+            rest = out[start.end():]
+            end = any_label.search(rest)
+            body = (rest[: end.start()] if end else rest).strip()
+            if body:
+                found[name] = body
+                break
     return found
+
+
+# How much of the notebook survives into the next chapter's prompt. Both lists
+# are append-only, so without a cap they grow until the prompt alone fills
+# num_ctx and Ollama starts silently dropping the *front* of it — the system
+# prompt and the instructions. That is not hypothetical: the chapter-6 notebook
+# call went in at 3783 prompt tokens against a 4096 window, and what came back
+# was the model parroting its input instead of following it.
+KEEP_CLUES = 24
+KEEP_TIMELINE = 30
+
+# The model is asked to answer NONE when a chapter introduces nothing new, which
+# is often true — a mood chapter genuinely has no new clue in it.
+NOTHING = re.compile(r"^(none|nothing|ingen|n/?a|-{1,3}|\.)\.?$", re.I)
+
+
+def bullets(text: str, max_items: int, max_chars: int) -> list[str]:
+    """Salvage a clean bullet list from a small model's answer.
+
+    Fail-closed by design: anything that does not look like a short list item is
+    dropped rather than written to the notebook. The notebook feeds every future
+    chapter prompt, so one bad line is not a cosmetic problem — it is a bad line
+    the novel then has to live with forever. This is how clues.md ended up
+    holding a whole paragraph of chapter 6's prose, verbatim, as a "clue".
+    """
+    items: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        line = re.sub(r"^[-*•>]+\s*|^\d+[.)]\s*", "", line)
+        line = line.strip().strip("*").strip()
+        if not line or NOTHING.match(line):
+            continue
+        # A label the model echoed back ("CLUES:", "New characters:").
+        if line.endswith(":") and len(line) < 40:
+            continue
+        if len(line) > max_chars:
+            print(f"[state] hopper over for lang linje ({len(line)} tegn): "
+                  f"{line[:60]}...", file=sys.stderr)
+            continue
+        items.append(line)
+        if len(items) >= max_items:
+            break
+    return items
+
+
+def ask_list(prompt: str, max_items: int, max_chars: int,
+             num_predict: int = 220) -> tuple[list[str], dict]:
+    body = ollama_call(prompt, system=EDITOR_SYSTEM, temperature=0.2,
+                       num_predict=num_predict)
+    text = PREAMBLE.sub("", body.get("response", "").strip()).strip()
+    return bullets(text, max_items, max_chars), body
+
+
+def entry_key(line: str) -> str:
+    """Dedupe key: the name at the head of a `* Name - description` line."""
+    line = re.sub(r"^[-*]\s*", "", line.strip())
+    return re.split(r"\s+[-–—]\s+|:", line, maxsplit=1)[0].strip().lower()
+
+
+def append_unique(existing: str, new: list[str], keep: int | None = None) -> str:
+    """Add only genuinely new lines, oldest-first, capped at `keep`."""
+    lines = [l.strip() for l in existing.splitlines() if l.strip()]
+    seen = {entry_key(l) for l in lines}
+    for item in new:
+        if entry_key(item) in seen:
+            continue
+        seen.add(entry_key(item))
+        lines.append(item if item.startswith(("*", "-")) else f"* {item}")
+    # Trim from the front: recent developments matter more to the next chapter
+    # than the setup, which the recap carries anyway.
+    return "\n".join(lines[-keep:] if keep else lines)
 
 
 def update_notebook(n: int, chapter_en: str) -> dict:
@@ -417,42 +492,137 @@ def update_notebook(n: int, chapter_en: str) -> dict:
     Fed the ENGLISH draft, not the translation: it is the same content, the model
     reads it better, and it keeps the notebook in the language the next chapter
     prompt will be written in.
+
+    FOUR SMALL CALLS, not one big one. Asking a 2B model to emit four differently
+    shaped sections in a single response does not work — it copies the label
+    template out of the prompt and fills in at most the last one, which is
+    exactly why chapter 7 updated recap.md and nothing else. One narrow question
+    per call, each with a short prompt and a small answer, is far more reliable
+    and keeps every prompt well clear of num_ctx.
+
+    Characters, clues and the timeline are APPEND-ONLY. "List what is new" is a
+    task this model can do; "rewrite this document without losing or corrupting
+    anything" is not, and every rewrite was a chance to destroy continuity.
     """
-    prompt = textwrap.dedent(f"""\
-        Here is the notebook and a new chapter. Update the notebook so it stays
-        short, precise and free of contradictions. Answer with ONLY these four
-        labels, each followed by a short bullet list (except RECAP, which is one
-        paragraph of about 250 words):
+    characters = read(STATE / "characters.md").strip()
+    clues = read(STATE / "clues.md").strip()
+    raw: list[str] = []   # every response, kept for offline diagnosis
+    bodies: list[dict] = []
 
-        CHARACTERS:
-        CLUES:
-        TIMELINE:
-        RECAP:
+    def record(label: str, body: dict) -> None:
+        raw.append(f"### {label}\n\n{body.get('response', '').strip()}")
+        bodies.append(body)
 
-        Keep every proper noun spelled exactly as it appears below.
+    # --- 1. New characters -------------------------------------------------
+    new_chars, body = ask_list(textwrap.dedent(f"""\
+        Below is a cast list, then a new chapter.
 
-        === CURRENT NOTEBOOK ===
-        Characters:
-        {read(STATE / 'characters.md')}
-        Clues:
-        {read(STATE / 'clues.md')}
-        Timeline:
-        {read(STATE / 'timeline.md')}
+        List ONLY characters who appear in the chapter and are NOT already on the
+        cast list. One line each, at most 3, in the form:
+        * Name - four or five words on who they are
 
-        === NEW CHAPTER {n} ===
+        Spell every name exactly as the chapter spells it. If every character is
+        already on the list, answer with the single word NONE.
+
+        === CAST LIST ===
+        {characters}
+
+        === CHAPTER {n} ===
         {chapter_en}
-    """)
-    body = ollama_call(prompt, system=EDITOR_SYSTEM, temperature=0.3, num_predict=900)
-    sections = split_sections(body.get("response", "").strip(), NOTEBOOK_SECTIONS)
+    """), max_items=3, max_chars=120)
+    record("CHARACTERS", body)
 
-    for name, path in (("CHARACTERS", "characters.md"), ("CLUES", "clues.md"),
-                       ("TIMELINE", "timeline.md"), ("RECAP", "recap.md")):
-        if name in sections:
-            write(STATE / path, sections[name])
-        else:
-            print(f"[state] ADVARSEL: fant ingen {name}-seksjon — beholder forrige.",
-                  file=sys.stderr)
-    return body
+    # --- 2. New clues ------------------------------------------------------
+    new_clues, body = ask_list(textwrap.dedent(f"""\
+        Below are the clues found so far, then a new chapter.
+
+        List ONLY concrete new facts, objects or contradictions revealed in the
+        chapter that a detective could act on. One line each, at most 3, at most
+        20 words per line, starting with "* ". No quotes from the chapter, no
+        atmosphere, no feelings — only things that are true in the story.
+
+        If the chapter reveals nothing new, answer with the single word NONE.
+
+        === CLUES SO FAR ===
+        {clues}
+
+        === CHAPTER {n} ===
+        {chapter_en}
+    """), max_items=3, max_chars=160)
+    record("CLUES", body)
+
+    # --- 3. One timeline entry --------------------------------------------
+    # Deliberately one line per chapter, generated without showing the model the
+    # existing timeline: it only has to describe what just happened, and cannot
+    # rewrite history it was not asked about.
+    entry, body = ask_list(textwrap.dedent(f"""\
+        Summarise what HAPPENS in this chapter as a single line of at most 20
+        words: who did what, where. No adjectives, no atmosphere. Answer with the
+        line only.
+
+        === CHAPTER {n} ===
+        {chapter_en}
+    """), max_items=1, max_chars=160, num_predict=80)
+    record("TIMELINE", body)
+
+    # --- 4. Recap (the one section that is genuinely a rewrite) ------------
+    recap_body = ollama_call(textwrap.dedent(f"""\
+        Below is a summary of the novel so far, then its newest chapter.
+
+        Rewrite the summary so it includes the new chapter. Keep it to one
+        paragraph of about 200 words. State only what has happened, in order.
+        Keep every name spelled as it appears below. Answer with the paragraph
+        only.
+
+        === SUMMARY SO FAR ===
+        {read(STATE / 'recap.md')}
+
+        === CHAPTER {n} ===
+        {chapter_en}
+    """), system=EDITOR_SYSTEM, temperature=0.3, num_predict=400)
+    record("RECAP", recap_body)
+
+    # --- write it back -----------------------------------------------------
+    def store(path: str, existing: str, new: list[str], noun: str,
+              keep: int | None = None) -> None:
+        if not new:
+            return
+        # Count before merging: once a list is at `keep`, every new item
+        # displaces an old one and the line count no longer moves.
+        known = {entry_key(l) for l in existing.splitlines() if l.strip()}
+        added = len({entry_key(i) for i in new} - known)
+        if added:
+            write(STATE / path, append_unique(existing, new, keep=keep))
+        print(f"[state] +{added} {noun}")
+
+    store("characters.md", characters, new_chars, "personer")
+    store("clues.md", clues, new_clues, "spor", keep=KEEP_CLUES)
+    if entry:
+        timeline = [l for l in read(STATE / "timeline.md").splitlines()
+                    # Drop any line for this chapter, so a re-run replaces its
+                    # entry instead of adding a second one.
+                    if l.strip() and not re.match(rf"^-\s*Kapittel\s+{n}\b", l.strip())]
+        timeline.append(f"- Kapittel {n}: {entry[0]}")
+        write(STATE / "timeline.md", "\n".join(timeline[-KEEP_TIMELINE:]))
+    else:
+        print("[state] ADVARSEL: ingen tidslinjelinje — beholder forrige.",
+              file=sys.stderr)
+
+    recap = PREAMBLE.sub("", recap_body.get("response", "").strip()).strip()
+    recap = re.sub(r"^[ \t]*#{0,4}[ \t]*\**[ \t]*(recap|summary)[ \t]*\**[ \t]*:"
+                   r"[ \t]*\**[ \t]*", "", recap, flags=re.I)
+    # A recap this short is a refusal or a stray label, not a summary. Keeping
+    # the previous one loses this chapter; accepting it loses the whole story.
+    if len(recap) >= 200:
+        write(STATE / "recap.md", recap)
+    else:
+        print(f"[state] ADVARSEL: sammendrag for kort ({len(recap)} tegn) — "
+              f"beholder forrige.", file=sys.stderr)
+
+    # There is no console on this box and no SSH yet, so the only way to see why
+    # the notebook did something odd is to commit the evidence alongside it.
+    write(STATE / "drafts" / f"kapittel-{n:03d}.notebook.md", "\n\n".join(raw))
+    return merge_stats(bodies)
 
 
 def slugify(s: str) -> str:

@@ -183,7 +183,7 @@ Three lessons worth keeping:
 
 ### The two-language pipeline
 
-Per chapter: one English draft call, N translation calls, one notebook call.
+Per chapter: one English draft call, N translation calls, four notebook calls.
 Drafting and the notebook run on `novelist` (gemma2:2b); **translation runs on a
 separate, Norwegian-specialised model** set by `NOVELIST_TRANSLATE_MODEL`. Only
 one model is resident at a time (`OLLAMA_MAX_LOADED_MODELS=1`), so peak RAM is
@@ -213,9 +213,38 @@ a whole chapter plus its translation does not fit — Ollama would truncate
 silently and publish half a chapter. Chunks never cross a paragraph boundary: cut
 mid-sentence, the model *finishes* the thought instead of translating it. The
 notebook stays in **English** (it is internal scaffolding that only ever feeds
-the English prompt) and self-migrates, since every run rewrites all four
-sections. `state/drafts/kapittel-NNN.en.md` keeps each English draft — the only
-way to tell a bad chapter from a bad translation.
+the English prompt). `state/drafts/kapittel-NNN.en.md` keeps each English draft
+— the only way to tell a bad chapter from a bad translation.
+
+### The notebook
+
+The notebook is the novel's entire long-range memory, so how it is written
+matters more than how the chapters are. Four rules, each of them learned the
+hard way over the first seven chapters:
+
+- **One narrow question per call, not one big one.** Asking a 2B model for four
+  differently-shaped sections in a single response does not work: it copies the
+  label template out of the prompt and fills in at most the last one. That is
+  why chapter 7 updated `recap.md` and nothing else. `update_notebook()` now
+  makes four small calls, each with a short prompt and a small answer.
+- **Characters, clues and timeline are append-only.** "List what is new in this
+  chapter" is a task this model can do. "Rewrite this document without losing or
+  corrupting anything" is not, and every rewrite was another chance to destroy
+  continuity. Only the recap is regenerated.
+- **Everything written back is validated.** A "bullet" longer than ~160
+  characters is the model pasting prose at us, not a clue — `bullets()` drops
+  it. This is how `clues.md` came to contain a whole paragraph of chapter 6,
+  verbatim, which then rode along in every subsequent prompt.
+- **Both lists are capped** (`KEEP_CLUES`, `KEEP_TIMELINE`), trimmed from the
+  front. Append-only without a cap grows the prompt until it fills `num_ctx`,
+  at which point Ollama drops the *front* of it — the system prompt and the
+  instructions. The chapter-6 notebook call went in at 3783 tokens against a
+  4096 window, and what came back was the model parroting its input.
+
+Every notebook response is also dumped verbatim to
+`state/drafts/kapittel-NNN.notebook.md` and committed. There is no console on
+this box, so that file is the only way to see why the notebook did something
+strange.
 
 Each published chapter records what it cost in its frontmatter under
 `generation:` — wall time split between `write:` and `translate:`, token counts,
@@ -236,8 +265,10 @@ The interesting models come back into range — try these first:
 - Avoid the *base* NorMistral "warm" model — it's a completion model and ignores
   instructions.
 
-A full chapter is ~20–40 min at these speeds (draft + translation); fine for a
-once-daily job, and `TimeoutStartSec` is 3h.
+Chapter 7 took 9m32s of model time (4m09s drafting at 3.84 tok/s, 5m23s
+translating at 2.72 tok/s) before the notebook was split into four calls; budget
+~20–30 min end to end now. Fine for a once-daily job, and `TimeoutStartSec`
+is 3h.
 `num_ctx` is deliberately small (4096) because memory lives in the notebook.
 
 ## 4. The website
@@ -247,6 +278,12 @@ Lives in the public repo — see
 Action symlinks that repo's `chapters/` into Astro's content collection, builds,
 and deploys to <https://larseliassen.github.io/mikromidas/>. Every chapter the
 Pi pushes rebuilds the site automatically; nothing here needs to change.
+
+The frontmatter this repo writes is consumed by a zod schema in
+`web/src/content/config.ts` over there, and **zod silently strips keys it does
+not know about** — a new field added here shows up nowhere until the schema
+learns about it. The `generation:` block is declared `.partial().passthrough()`
+precisely so that stops being true.
 
 ## Tuning the story
 

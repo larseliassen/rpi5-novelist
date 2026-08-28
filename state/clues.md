@@ -1,3 +1,4 @@
-*  En død kropp ligger i båten, avgrunn av vinden og snøet. Noen bilder fra et kamera i båten viser at Anders Bjørnstad har holdt en pistol mot skråningen til kroppen da han sto på land før han ble sendt for å ta seg av det.  Hvilken straff for denne handlingen? 
-* The Lighthouse Keeper's Log:  Elin carefully lifted the worn, leather-bound journal from her satchel. It lay open on the rough wooden table beside her, its pages filled with cramped, almost frantic scrawl detailing the harsh realities of life at Langesund lighthouse. A century of relentless storms and long nights spent battling against nature had etched lines into the aged wood, and the worn ink seemed to shimmer in the flickering lamplight. 
-*  "There's something about this," Ingrid insisted, leaning forward. “The man’s presence here was... significant.”
+* En død kropp ble funnet i en båt utenfor Fjerdesund.
+* Bilder fra et kamera i båten viser Anders Bjørnstad med et våpen ved kroppen.
+* Fyrvokterens dagbok fra Langesund fyr er i Elins besittelse.
+* Ingrid Larsen sier at Anders «er her, men han vil ikke snakke».
