@@ -1,4 +1,1 @@
-Anders Bjørnstad, en gammel mand med en gammel bøygetur i hånden, har vært involvert i en tragisk hendelse på Fjerdesund. Han ble sendt for å ta seg av en død kropp i båten.  Bilder fra kameraet viser at han holdt pistol mot skråningen til kroppen før han ble sendt for å ta seg av det.
-
-        Tidslinje:
-        - Dag 0: Historien begynner.
+Elin Johansen, a seasoned detective with a somber demeanor and dark hair, investigates the death of an unknown individual found in a boat off the coast of Fjerdesund.  She encounters Anders Bjørnstad, a man seemingly burdened by secrets, who appears to have been at the scene of the crime.  Ingrid Larsen, a woman deeply connected to the area's history and troubled by the situation, offers cryptic insights into the case's complexities. The weight of silence hangs heavy as Elin seeks answers while facing an unsettling mystery.
