@@ -201,6 +201,13 @@ Current translator: **Borealis 4B** (`hf.co/NbAiLab/borealis-4b-instruct-preview
   bundles an 851MB CLIP vision projector we never use, totalling 3.3GB, and is
   cgroup-killed at load. The `hf.co/...-gguf:Q4_K_M` build above is text-only.
 
+If the translator cannot be pulled, or is killed on load, the run **does not
+fail** — `run.sh` tolerates a failed `pull` and `translate_chapter()` downgrades
+to `novelist` for the rest of the chapter. The published frontmatter records
+`translate_model:` as the model that actually ran, so a fallback is visible
+after the fact. This matters because there is no console on this box: the
+alternative to falling back is a day with no chapter and no way to see why.
+
 The translation is chunked paragraph-by-paragraph because `num_ctx` is 4096 and
 a whole chapter plus its translation does not fit — Ollama would truncate
 silently and publish half a chapter. Chunks never cross a paragraph boundary: cut

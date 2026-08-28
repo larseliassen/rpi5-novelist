@@ -315,6 +315,9 @@ def translate_chapter(chapter_en: str) -> tuple[str, list[dict]]:
 
     out: list[str] = []
     stats: list[dict] = []
+    # Downgraded in place on the first failure, so we do not pay the load timeout
+    # again for every remaining chunk.
+    translator = TRANSLATE_MODEL
     for i, chunk in enumerate(chunks, 1):
         prompt = textwrap.dedent(f"""\
             Oversett teksten under til norsk bokmål.
@@ -332,22 +335,40 @@ def translate_chapter(chapter_en: str) -> tuple[str, list[dict]]:
             === TEKST ===
             {chunk}
         """)
-        body = ollama_call(
-            prompt,
-            system=TRANSLATOR_SYSTEM,
-            temperature=0.25,
-            # Norwegian needs more tokens than the English it came from, and this
-            # tokenizer is not kind to it. Budget generously: a truncated chunk
-            # is a hole in the middle of the published chapter.
-            num_predict=min(1400, max(320, int(len(chunk) / 1.4))),
-            model=TRANSLATE_MODEL,
-            # Set explicitly rather than relying on the model's own defaults: a
-            # registry pull often ships num_ctx 2048, which would silently clip
-            # the glossary off the front of the prompt. repeat_penalty is dropped
-            # to 1.0 because translation legitimately repeats — names, refrains,
-            # sentence rhythm — and penalising that makes the model paraphrase.
-            options={"num_ctx": 4096, "repeat_penalty": 1.0},
-        )
+        # A dedicated translator is the most likely thing here to fail at runtime:
+        # it is bigger than the drafting model and closer to MemoryMax, so a bad
+        # day is a cgroup kill on load. Falling back to MODEL costs quality for
+        # one chapter; not falling back costs the chapter entirely, and there is
+        # no way to notice from off the LAN.
+        def call(model: str) -> dict:
+            return ollama_call(
+                prompt,
+                system=TRANSLATOR_SYSTEM,
+                temperature=0.25,
+                # Norwegian needs more tokens than the English it came from, and
+                # this tokenizer is not kind to it. Budget generously: a truncated
+                # chunk is a hole in the middle of the published chapter.
+                num_predict=min(1400, max(320, int(len(chunk) / 1.4))),
+                model=model,
+                # Set explicitly rather than relying on the model's own defaults:
+                # a registry pull often ships num_ctx 2048, which would silently
+                # clip the glossary off the front of the prompt. repeat_penalty
+                # drops to 1.0 because translation legitimately repeats — names,
+                # refrains, sentence rhythm — and penalising that makes the model
+                # paraphrase instead of translate.
+                options={"num_ctx": 4096, "repeat_penalty": 1.0},
+            )
+
+        try:
+            body = call(translator)
+        except Exception as exc:
+            if translator == MODEL:
+                raise
+            print(f"[translate] ADVARSEL: {translator} feilet ({exc}) — "
+                  f"faller tilbake til {MODEL} for resten av kapittelet.",
+                  file=sys.stderr)
+            translator = MODEL
+            body = call(translator)
         piece = PREAMBLE.sub("", body.get("response", "").strip()).strip()
         if not piece:
             # Better a visible English paragraph than a silent gap in the story.
@@ -465,6 +486,10 @@ def main() -> int:
 
     chapter_nb, translate_bodies = translate_chapter(chapter_en)
     translate_stats = merge_stats(translate_bodies)
+    # Last chunk wins: if we fell back partway, the fallback is what finished it.
+    translate_model_used = (
+        translate_bodies[-1].get("model") if translate_bodies else None
+    ) or TRANSLATE_MODEL
     print("[translate] " + ", ".join(f"{k}={v}" for k, v in translate_stats.items()))
 
     # The heading survives translation as "Kapittel N" if we are lucky and as
@@ -494,7 +519,10 @@ def main() -> int:
         f'  host: "{platform.node()}"',
         f'  beat: "{beat}"',
         '  pipeline: "en -> nb"',
-        f'  translate_model: "{TRANSLATE_MODEL}"',
+        # What actually ran, not what was configured — the translator falls back
+        # to the drafting model if it cannot load, and the frontmatter should say
+        # so rather than quietly crediting a model that never spoke.
+        f'  translate_model: "{translate_model_used}"',
         f'  seconds: {round(write_stats["seconds"] + translate_stats["seconds"], 1)}',
         "  write:",
     ]
