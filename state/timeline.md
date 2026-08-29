@@ -1,3 +1,4 @@
 - Kapittel 1-5: Elin Johansen etterforsker et lik funnet i en båt ved Fjerdesund.
 - Kapittel 6: Elin leser fyrvokterens dagbok fra Langesund fyr.
 - Kapittel 7: Elin møter Anders Bjørnstad på fergeleiet i Skrogvær; han nekter å forklare seg.
+- Kapittel 9: Elin investigates Anders Bjørnstad's case after finding a ship whistle.
