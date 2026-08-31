@@ -3,3 +3,4 @@
 - Kapittel 7: Elin møter Anders Bjørnstad på fergeleiet i Skrogvær; han nekter å forklare seg.
 - Kapittel 9: Elin investigates Anders Bjørnstad's case after finding a ship whistle.
 - Kapittel 10: Elin Johansen finds Anders Bjørnstad's camera and he reveals it is not his doing.
+- Kapittel 11: Elin examines a lighthouse blueprint and receives a mysterious box from Mikael.

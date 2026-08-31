@@ -3,3 +3,4 @@
 * Ingrid Larsen - Gammelt par fra Lofoten-sjøen
 * Mikro Midas - En superskurk fra Disney-universet
 * The Ship's Captain - Former captain of ship
+* Mikael Larsen - Anders' childhood friend
