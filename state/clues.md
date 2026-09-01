@@ -9,3 +9,6 @@
 * A weathered wooden box containing a mermaid image on its lid is found by Elin Johansen.
 * A worn leather strap found in Anders Bjørnstad's bag.
 * A video file of the dead man's last moments is missing.
+* Anders Bjørnstad is wearing a bag with a worn leather strap.
+* A weathered wooden box containing a mermaid image on its lid was found by Elin Johansen.
+* The camera footage of the dead man is missing.
