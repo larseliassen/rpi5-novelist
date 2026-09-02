@@ -4,3 +4,5 @@
 * Mikro Midas - En superskurk fra Disney-universet
 * The Ship's Captain - Former captain of ship
 * Mikael Larsen - Anders' childhood friend
+* The Woman -  white figure, obscured by fog
+* The Old Captain - former captain of ship

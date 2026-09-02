@@ -12,3 +12,4 @@
 * Anders Bjørnstad is wearing a bag with a worn leather strap.
 * A weathered wooden box containing a mermaid image on its lid was found by Elin Johansen.
 * The camera footage of the dead man is missing.
+* Mikael Larsen's voice is heavy with something unyielding.

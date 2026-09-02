@@ -5,3 +5,4 @@
 - Kapittel 10: Elin Johansen finds Anders Bjørnstad's camera and he reveals it is not his doing.
 - Kapittel 11: Elin examines a lighthouse blueprint and receives a mysterious box from Mikael.
 - Kapittel 12: Elin arrives at Fjerdesund; Anders meets her, a man waits with a cryptic message.
+- Kapittel 13: Mikael reveals a woman in white and a hidden box to Elin.
