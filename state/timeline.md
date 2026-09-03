@@ -6,3 +6,4 @@
 - Kapittel 11: Elin examines a lighthouse blueprint and receives a mysterious box from Mikael.
 - Kapittel 12: Elin arrives at Fjerdesund; Anders meets her, a man waits with a cryptic message.
 - Kapittel 13: Mikael reveals a woman in white and a hidden box to Elin.
+- Kapittel 14: Elin receives box from Mikael; they leave for unknown destination.

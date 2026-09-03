@@ -13,3 +13,5 @@
 * A weathered wooden box containing a mermaid image on its lid was found by Elin Johansen.
 * The camera footage of the dead man is missing.
 * Mikael Larsen's voice is heavy with something unyielding.
+* A wooden box with a mermaid image on its lid was found by Elin Johansen.
+* Mikael Larsen has a box at home.
