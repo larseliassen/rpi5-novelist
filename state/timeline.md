@@ -8,3 +8,4 @@
 - Kapittel 13: Mikael reveals a woman in white and a hidden box to Elin.
 - Kapittel 14: Elin receives box from Mikael; they leave for unknown destination.
 - Kapittel 15: Mikael Larsen tells Elin Anders confessed about the dead man's past.
+- Kapittel 16: Elin and Mikael investigate the clock tower and its secrets.
