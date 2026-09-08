@@ -11,3 +11,4 @@
 - Kapittel 16: Elin and Mikael investigate the clock tower and its secrets.
 - Kapittel 17: Mikael confesses Anders saw visions connected to the lighthouse and woman in a portrait.
 - Kapittel 18: Elin and Mikael investigate suspicious smoke near the lighthouse.
+- Kapittel 19: Mikael reveals a connection between dreams and the woman in photos; Elin discovers the woman is real.
