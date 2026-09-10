@@ -18,3 +18,5 @@
 * Mikael mentions a box at home.
 * A figure appeared in Anders' vision.
 * The woman was described as appearing out of thin air.
+* The camera is missing.
+* Mikael has a box at home.

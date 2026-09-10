@@ -6,3 +6,4 @@
 * Mikael Larsen - Anders' childhood friend
 * The Woman -  white figure, obscured by fog
 * The Old Captain - former captain of ship
+* Fjerdesund - old-fashioned ship
