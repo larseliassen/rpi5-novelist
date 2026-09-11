@@ -1,5 +1,3 @@
-* En død kropp ble funnet i en båt utenfor Fjerdesund.
-* Bilder fra et kamera i båten viser Anders Bjørnstad med et våpen ved kroppen.
 * Fyrvokterens dagbok fra Langesund fyr er i Elins besittelse.
 * Ingrid Larsen sier at Anders «er her, men han vil ikke snakke».
 * An old ship whistle found in a box.
@@ -22,3 +20,5 @@
 * Mikael has a box at home.
 * A witness saw Anders on the ferry.
 * The witness saw Anders by the docks.
+* A photograph of Ingrid Larsen is found.
+* The camera crew arrives.
