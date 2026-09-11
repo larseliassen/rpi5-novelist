@@ -93,6 +93,36 @@ in
     nssmdns4 = true;
   };
 
+  ###### Remote access (Tailscale) ######
+  # Google Wifi will not forward a port here without turning the whole LAN into a
+  # project, and exposing sshd to the open internet for a hobby appliance is not
+  # a trade worth making. Tailscale instead gives the Pi a stable address on a
+  # private tailnet: reachable from the Mac or a phone, from anywhere, with
+  # nothing at all open on the router.
+  #
+  # NO AUTH KEY LIVES IN THIS REPO. Enrol the box once, by hand, over the LAN:
+  #
+  #   sudo tailscale up          # then open the URL it prints
+  #
+  # The resulting node key is stored in /var/lib/tailscale and survives reboots
+  # and nixos-rebuilds, so this is a one-time step. The module does support
+  # `authKeyFile` for unattended enrolment, but any key reachable from here would
+  # have to be committed, and a credential in git history is forever — even in a
+  # private repo, and especially in one that might not stay private.
+  services.tailscale = {
+    enable = true;
+    # Inbound UDP 41641 lets peers negotiate a direct connection. Without it the
+    # tunnel still works, but every packet is relayed through a DERP server.
+    openFirewall = true;
+  };
+
+  # Traffic on tailscale0 is already authenticated by the tailnet, so the host
+  # firewall does not need to filter it a second time. sshd would be reachable
+  # over the tunnel regardless (its port is opened on all interfaces), but this
+  # means any service added later is reachable over the tailnet — and only over
+  # the tailnet — without another firewall edit.
+  networking.firewall.trustedInterfaces = [ "tailscale0" ];
+
   # The bootstrap clone and the daily push run non-interactively, so github.com's
   # host key must already be trusted or ssh aborts at the prompt. The alias below
   # resolves to the same host, hence the same key under both names.

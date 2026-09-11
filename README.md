@@ -152,6 +152,42 @@ The drafting model is built from the Modelfile on every run and the translation
 model is pulled if missing, so there is no manual `ollama pull` / `ollama create`
 step. The first run after changing the translator downloads ~2.5GB.
 
+### Remote access: Tailscale
+
+`services.tailscale` is enabled in `configuration.nix`, but the box still has to
+be enrolled once, by hand, while you are on the same LAN:
+
+```bash
+# on the Pi
+sudo tailscale up          # then open the URL it prints
+tailscale ip -4            # the address it will keep
+```
+
+From then on it is reachable from anywhere on your tailnet as `novelist`:
+
+```bash
+ssh novelist@novelist      # MagicDNS; no port forwarding, nothing open on the router
+```
+
+**No auth key is stored in this repo, and none should be.** The module offers
+`authKeyFile` for unattended enrolment, but the only way to get a key onto the Pi
+without an existing session is to commit it — and a credential in git history is
+permanent. One manual `tailscale up` on the LAN avoids the problem entirely; the
+node key then lives in `/var/lib/tailscale` and survives reboots and rebuilds.
+
+Two options worth knowing about:
+
+- `sudo tailscale up --ssh` puts sshd behind tailnet identity instead of
+  `authorized_keys`, so you can reach the box from a device whose key it has
+  never seen. Convenient; it also means your tailnet ACLs, not the Pi, decide
+  who gets root.
+- Enrol with `--advertise-exit-node` only if you want the Pi to route your
+  traffic. It is a 4GB board that spends its mornings pinned at 100% CPU, so
+  probably not.
+
+Nothing about this changes the deploy model — a push is still the deploy. SSH is
+for reading `journalctl` when a chapter goes wrong.
+
 ## 3. Choosing the model (Norwegian quality vs. RAM)
 
 **Know which board you have first** — `head -1 /proc/meminfo`. This matters more
