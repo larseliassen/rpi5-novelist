@@ -14,3 +14,4 @@
 - Kapittel 19: Mikael reveals a connection between dreams and the woman in photos; Elin discovers the woman is real.
 - Kapittel 20: Elin arrives at Værnes Police Station and meets with the director to discuss a case.
 - Kapittel 21: Elin investigates director's note and missing camera after witness claims apparition at Fjerdesund.
+- Kapittel 22: Elin finds a photo of Ingrid Larsen and learns Anders Bjørnstad was seen again.

@@ -7,3 +7,4 @@
 * The Woman -  white figure, obscured by fog
 * The Old Captain - former captain of ship
 * Fjerdesund - old-fashioned ship
+* The Witness -  witness
