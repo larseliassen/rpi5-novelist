@@ -16,3 +16,4 @@
 - Kapittel 21: Elin investigates director's note and missing camera after witness claims apparition at Fjerdesund.
 - Kapittel 22: Elin finds a photo of Ingrid Larsen and learns Anders Bjørnstad was seen again.
 - Kapittel 23: Mikael gives Elin a photograph and then leaves for work.
+- Kapittel 24: Elin meets Mikael; they investigate witness account at docks.

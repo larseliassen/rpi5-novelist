@@ -1,5 +1,3 @@
-* Fyrvokterens dagbok fra Langesund fyr er i Elins besittelse.
-* Ingrid Larsen sier at Anders «er her, men han vil ikke snakke».
 * An old ship whistle found in a box.
 * The camera footage is missing.
 * The fire warden's diary exists.
@@ -22,3 +20,5 @@
 * The witness saw Anders by the docks.
 * A photograph of Ingrid Larsen is found.
 * The camera crew arrives.
+* Mikael Larsen has a photograph of Ingrid Larsen.
+* The camera crew is present.
