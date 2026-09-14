@@ -18,3 +18,4 @@
 - Kapittel 23: Mikael gives Elin a photograph and then leaves for work.
 - Kapittel 24: Elin meets Mikael; they investigate witness account at docks.
 - Kapittel 25: Elin investigates witness description of woman seen with Anders.
+- Kapittel 26: Elin receives director's note about Anders Larsen and learns of police investigation at his apartment.

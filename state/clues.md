@@ -1,5 +1,3 @@
-* An old ship whistle found in a box.
-* The camera footage is missing.
 * The fire warden's diary exists.
 * Anders Bjørnstad is carrying a bag with a worn leather strap.
 * A weathered wooden box containing a mermaid image on its lid is found by Elin Johansen.
@@ -22,3 +20,5 @@
 * The camera crew arrives.
 * Mikael Larsen has a photograph of Ingrid Larsen.
 * The camera crew is present.
+* A police car arrived at Anders' apartment.
+* A box was found at Anders' apartment.
