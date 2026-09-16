@@ -20,3 +20,4 @@
 - Kapittel 25: Elin investigates witness description of woman seen with Anders.
 - Kapittel 26: Elin receives director's note about Anders Larsen and learns of police investigation at his apartment.
 - Kapittel 27: Elin interviews witnesses, searches for Anders, encounters captain's cryptic message.
+- Kapittel 28: Elin investigates clues related to Anders Larsen's visions.  Mikael reveals Ingrid Larsen witnessed something.
