@@ -1,6 +1,3 @@
-* A worn leather strap found in Anders Bjørnstad's bag.
-* A video file of the dead man's last moments is missing.
-* Anders Bjørnstad is wearing a bag with a worn leather strap.
 * A weathered wooden box containing a mermaid image on its lid was found by Elin Johansen.
 * The camera footage of the dead man is missing.
 * Mikael Larsen's voice is heavy with something unyielding.
@@ -22,3 +19,6 @@
 * Witness saw Anders near docks.
 * A car was pulled up near the docks.
 * The witness saw Anders near the docks.
+* Director mentions Værnes Lighthouse visit.
+* Photo of Ingrid Larsen found with time stamp matching Anders' presence.
+* Missing camera footage.
