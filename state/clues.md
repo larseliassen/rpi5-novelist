@@ -1,5 +1,3 @@
-* A weathered wooden box containing a mermaid image on its lid was found by Elin Johansen.
-* The camera footage of the dead man is missing.
 * Mikael Larsen's voice is heavy with something unyielding.
 * A wooden box with a mermaid image on its lid was found by Elin Johansen.
 * Mikael Larsen has a box at home.
@@ -22,3 +20,5 @@
 * Director mentions Værnes Lighthouse visit.
 * Photo of Ingrid Larsen found with time stamp matching Anders' presence.
 * Missing camera footage.
+* A witness saw Anders near docks.
+* Director Olsen's phone is ringing.
