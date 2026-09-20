@@ -24,3 +24,4 @@
 - Kapittel 29: Director reveals false trail in Anders' visions; Ingrid Larsen connected to the lighthouse.
 - Kapittel 30: Director reveals Anders Larsen's alibi is crumbling; witnesses saw him with someone.
 - Kapittel 31: Director Olsen reveals Mikael's involvement and his alibi is flawed.  Elin questions him about it.  Mikael appears in the director's office.
+- Kapittel 32: Director Olsen shows Elin photo of Ingrid Larsen; Mikael confesses Anders confessed.

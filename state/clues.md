@@ -1,6 +1,3 @@
-* Mikael Larsen's voice is heavy with something unyielding.
-* A wooden box with a mermaid image on its lid was found by Elin Johansen.
-* Mikael Larsen has a box at home.
 * Mikael mentions a box at home.
 * A figure appeared in Anders' vision.
 * The woman was described as appearing out of thin air.
@@ -22,3 +19,6 @@
 * Missing camera footage.
 * A witness saw Anders near docks.
 * Director Olsen's phone is ringing.
+* A wooden box found at Anders' apartment contains a photograph of Ingrid Larsen.
+* Mikael mentions finding a box containing a photograph of Ingrid Larsen.
+* The photo shows Ingrid Larsen with an unsettling intensity.
