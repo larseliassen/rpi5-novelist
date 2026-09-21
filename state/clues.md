@@ -1,6 +1,3 @@
-* Mikael mentions a box at home.
-* A figure appeared in Anders' vision.
-* The woman was described as appearing out of thin air.
 * The camera is missing.
 * Mikael has a box at home.
 * A witness saw Anders on the ferry.
@@ -22,3 +19,6 @@
 * A wooden box found at Anders' apartment contains a photograph of Ingrid Larsen.
 * Mikael mentions finding a box containing a photograph of Ingrid Larsen.
 * The photo shows Ingrid Larsen with an unsettling intensity.
+* Director mentions a witness saw Anders near docks.
+* Witness saw Anders by the docks.
+* Kåre is dead.

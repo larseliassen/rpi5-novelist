@@ -8,3 +8,4 @@
 * The Old Captain - former captain of ship
 * Fjerdesund - old-fashioned ship
 * The Witness -  witness
+* Kåre - deceased man
