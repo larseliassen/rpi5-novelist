@@ -1,6 +1,3 @@
-* The camera is missing.
-* Mikael has a box at home.
-* A witness saw Anders on the ferry.
 * The witness saw Anders by the docks.
 * A photograph of Ingrid Larsen is found.
 * The camera crew arrives.
@@ -22,3 +19,6 @@
 * Director mentions a witness saw Anders near docks.
 * Witness saw Anders by the docks.
 * Kåre is dead.
+* A box with photograph of Ingrid Larsen found at Anders' apartment.
+* Director Olsen mentions a witness saw Anders near docks.
+* A car arrived on the docks.

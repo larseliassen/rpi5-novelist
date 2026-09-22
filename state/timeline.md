@@ -26,3 +26,4 @@
 - Kapittel 31: Director Olsen reveals Mikael's involvement and his alibi is flawed.  Elin questions him about it.  Mikael appears in the director's office.
 - Kapittel 32: Director Olsen shows Elin photo of Ingrid Larsen; Mikael confesses Anders confessed.
 - Kapittel 33: Director shows Elin photos of Anders and a second person, dead Kåre.
+- Kapittel 34: Elin enters director Olsen's office, Mikael found camera, information on Anders' father revealed.
