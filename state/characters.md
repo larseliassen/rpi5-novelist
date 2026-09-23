@@ -9,3 +9,4 @@
 * Fjerdesund - old-fashioned ship
 * The Witness -  witness
 * Kåre - deceased man
+* Witness - witness

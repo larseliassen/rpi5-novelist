@@ -27,3 +27,4 @@
 - Kapittel 32: Director Olsen shows Elin photo of Ingrid Larsen; Mikael confesses Anders confessed.
 - Kapittel 33: Director shows Elin photos of Anders and a second person, dead Kåre.
 - Kapittel 34: Elin enters director Olsen's office, Mikael found camera, information on Anders' father revealed.
+- Kapittel 35: Director Olsen reveals the woman from Anders' visions is linked to his death.
