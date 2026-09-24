@@ -1,5 +1,3 @@
-* The witness saw Anders by the docks.
-* A photograph of Ingrid Larsen is found.
 * The camera crew arrives.
 * Mikael Larsen has a photograph of Ingrid Larsen.
 * The camera crew is present.
@@ -22,3 +20,5 @@
 * A box with photograph of Ingrid Larsen found at Anders' apartment.
 * Director Olsen mentions a witness saw Anders near docks.
 * A car arrived on the docks.
+* A handwritten letter addressed to 'Mikro Midas' was found in a silver case.
+* The photograph shows Ingrid Larsen with an unsettling intensity.

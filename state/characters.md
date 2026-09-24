@@ -10,3 +10,4 @@
 * The Witness -  witness
 * Kåre - deceased man
 * Witness - witness
+* Anders Larsen -  Fattig mand
