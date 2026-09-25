@@ -1,4 +1,3 @@
-- Kapittel 6: Elin leser fyrvokterens dagbok fra Langesund fyr.
 - Kapittel 7: Elin møter Anders Bjørnstad på fergeleiet i Skrogvær; han nekter å forklare seg.
 - Kapittel 9: Elin investigates Anders Bjørnstad's case after finding a ship whistle.
 - Kapittel 10: Elin Johansen finds Anders Bjørnstad's camera and he reveals it is not his doing.
@@ -28,3 +27,4 @@
 - Kapittel 34: Elin enters director Olsen's office, Mikael found camera, information on Anders' father revealed.
 - Kapittel 35: Director Olsen reveals the woman from Anders' visions is linked to his death.
 - Kapittel 36: Elin finds a letter addressed to Anders Larsen; director seeks him.
+- Kapittel 37: Olsen and Johan deliver note to Elin, who receives Anders' message.

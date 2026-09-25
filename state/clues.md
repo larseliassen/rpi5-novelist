@@ -1,6 +1,3 @@
-* The camera crew arrives.
-* Mikael Larsen has a photograph of Ingrid Larsen.
-* The camera crew is present.
 * A police car arrived at Anders' apartment.
 * A box was found at Anders' apartment.
 * Witness saw Anders near docks.
@@ -22,3 +19,6 @@
 * A car arrived on the docks.
 * A handwritten letter addressed to 'Mikro Midas' was found in a silver case.
 * The photograph shows Ingrid Larsen with an unsettling intensity.
+* Olaf's assistant is Johan.
+* A fisherman named Olaf claims ownership of camera footage.
+* Anders Larsen's photograph shows unsettling intensity.

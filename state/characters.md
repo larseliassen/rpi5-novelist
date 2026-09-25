@@ -11,3 +11,5 @@
 * Kåre - deceased man
 * Witness - witness
 * Anders Larsen -  Fattig mand
+* Olaf - fisherman
+* Johan - assistant
